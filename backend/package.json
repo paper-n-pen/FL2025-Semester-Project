@@ -1,0 +1,15 @@
+{
+  "name": "fl2025-semester-project",
+  "version": "1.0.0",
+  "description": "Name your repository using the following format:   **SP2025_Group_&lt;Group Number&gt;**   (Example: FL2025_Group_9)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
