@@ -1,9 +1,11 @@
-interface LoginResponse {
-    token: string;
-  }
-  
+//my-react-app/src/Login.tsx
+
 import { useState } from 'react';
 import axios from 'axios';
+
+interface LoginResponse {
+  token: string;
+}
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -12,20 +14,29 @@ function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
       const res = await axios.post<LoginResponse>('/api/login', { email, password });
       const token = res.data.token;
-      localStorage.setItem('token', token); // store JWT
-      // redirect to dashboard or home
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
-    }
+      localStorage.setItem('token', token);
   };
 
   return (
     <form onSubmit={handleLogin}>
-      <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-      <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+      <input
+        type="email"
+        name="email"
+        placeholder="Email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        required
+      />
+      <input
+        type="password"
+        name="password"
+        placeholder="Password"
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        required
+      />
       <button type="submit">Login</button>
       {error && <p>{error}</p>}
     </form>
