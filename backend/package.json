@@ -4,7 +4,7 @@
   "description": "Name your repository using the following format:   **SP2025_Group_&lt;Group Number&gt;**   (Example: FL2025_Group_9)",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
