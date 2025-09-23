@@ -1,17 +1,18 @@
 //backend/index.js
 
 import express from 'express';
-import authRoutes from './routes/auth.js';
 import dotenv from 'dotenv';
-dotenv.config();
+import authRoutes from './routes/auth.js';
+import loginRoutes from './routes/login.js';
 
+dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Parse JSON bodies
 app.use(express.json());
 
-// Mount authentication routes
+// Mount routes
 app.use('/api', authRoutes);
+app.use('/api', loginRoutes);
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
