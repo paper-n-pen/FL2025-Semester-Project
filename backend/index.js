@@ -1,13 +1,17 @@
-const express = require('express');
+//backend/index.js
+
+import express from 'express';
+import authRoutes from './routes/auth.js';
+import dotenv from 'dotenv';
+dotenv.config();
+
 const app = express();
 const PORT = 3000;
 
-// Define a simple route
-app.get('/', (req, res) => {
-  res.send('Hello, Express!');
-});
+// Parse JSON bodies
+app.use(express.json());
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+// Mount authentication routes
+app.use('/api', authRoutes);
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
