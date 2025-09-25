@@ -2,7 +2,6 @@ name: CI Check
 
 on:
   push:
-    branches: [ "main", "helloWorld, authentication" ] # Trigger on main and helloWorld branches
   pull_request:
     branches: [ "main" ] # Trigger on pull requests to main
 
