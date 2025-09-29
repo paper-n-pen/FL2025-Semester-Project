@@ -1,17 +1,3 @@
-<<<<<<< HEAD
-//backend/index.js
-
-import express from 'express';
-import dotenv from 'dotenv';
-import authRoutes from './routes/auth.js';
-import loginRoutes from './routes/login.js';
-
-dotenv.config();
-const app = express();
-const PORT = 3000;
-
-app.use(express.json());
-=======
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -37,7 +23,6 @@ app.get('/', async (req, res) => {
     res.status(500).send('Error connecting to database');
   }
 });
->>>>>>> main
 
 // Mount routes
 app.use('/api', authRoutes);
