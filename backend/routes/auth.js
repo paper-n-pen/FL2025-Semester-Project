@@ -1,4 +1,4 @@
-// routes/auth.js
+// backend/routes/auth.js
 import express from 'express';
 import bcrypt from 'bcrypt';
 import { pool } from '../db.js';
