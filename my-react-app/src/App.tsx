@@ -1,25 +1,18 @@
 // my-react-app/src/App.tsx
 
 import { Routes, Route, Link } from 'react-router-dom';
-
-function Home() {
-  return <h1>Home Page</h1>;
-}
-
-function Login() {
-  return <h1>Login Page</h1>;
-}
+import Register from './Register';
+import Login from './Login';
 
 function App() {
   return (
     <div>
       <nav>
-        <Link to="/">Home</Link> |{" "}
+        <Link to="/register">Register</Link> |{" "}
         <Link to="/login">Login</Link>
       </nav>
-
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
       </Routes>
     </div>

@@ -6,6 +6,9 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
+const authRoutes = require('./routes/auth');
+const loginRoutes = require('./routes/login');
+
 app.use(cors());
 
 // PostgreSQL connection pool
@@ -27,7 +30,7 @@ app.get('/', async (req, res) => {
 });
 
 // Mount routes
-app.use('/api', authRoutes);
-app.use('/api', loginRoutes);
+app.use('/routes', authRoutes);
+app.use('/routes', loginRoutes);
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

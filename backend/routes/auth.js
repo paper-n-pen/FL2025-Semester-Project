@@ -1,7 +1,8 @@
 // backend/routes/auth.js
-import express from 'express';
-import bcrypt from 'bcrypt';
-import { pool } from '../db.js';
+
+const express = require('express');
+const bcrypt = require('bcrypt');
+const { pool } = require('../db');
 
 const router = express.Router();
 
@@ -9,22 +10,17 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
-  // Basic validation
   if (!username || !email || !password) {
     return res.status(400).json({ message: 'All fields required' });
   }
 
   try {
-    // Check if user already exists
     const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
-
-    // Insert user into database
     await pool.query(
       'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)',
       [username, email, passwordHash]
@@ -37,4 +33,4 @@ router.post('/register', async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

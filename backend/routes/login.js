@@ -1,9 +1,9 @@
 // backend/routes/login.js
 
-import express from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { pool } from '../db.js'; // Adjust path to your db.js
+const express = require('express');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { pool } = require('../db');
 
 const router = express.Router();
 
@@ -27,4 +27,4 @@ router.post('/login', async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;
