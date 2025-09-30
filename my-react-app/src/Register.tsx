@@ -1,7 +1,7 @@
 //my-react-app/src/Register.tsx
 
 import { useState } from 'react';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 function Register() {
@@ -21,7 +21,7 @@ function Register() {
       // Redirect to login page after 1 second
       setTimeout(() => navigate('/login'), 1000);
     } catch (err) {
-      if (axios.isAxiosError(err)) {
+      if (isAxiosError(err)) {
         setError(err.response?.data?.message || 'Registration failed');
       } else {
         setError('An unexpected error occurred.');

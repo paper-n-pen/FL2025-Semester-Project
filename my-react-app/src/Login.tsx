@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 interface LoginResponse {
   token: string;
@@ -22,7 +22,7 @@ function Login() {
       localStorage.setItem('token', token);
       navigate('/dashboard'); // <-- redirect after successful login
     } catch (err) {
-      if (axios.isAxiosError(err)) {
+      if (isAxiosError(err)) {
         setError(err.response?.data?.message || 'Login failed.');
       } else {
         setError('An unexpected error occurred.');
