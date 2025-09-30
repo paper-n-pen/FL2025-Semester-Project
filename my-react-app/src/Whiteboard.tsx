@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import WhiteboardToolbar from "./components/WhiteboardToolbar";
+
 
 const socket = io("http://localhost:3000");
 
@@ -127,15 +129,19 @@ const Whiteboard = () => {
     };
 
     return (
-        <canvas
-            onMouseDown={startDrawing}
-            onMouseUp={finishDrawing}
-            onMouseMove={draw}
-            onMouseLeave={finishDrawing}
-            ref={canvasRef}
-            style={{ border: '1px solid black', backgroundColor: 'white' }}
-        />
-    );
+  <>
+    <WhiteboardToolbar />
+    <canvas
+      onMouseDown={startDrawing}
+      onMouseUp={finishDrawing}
+      onMouseMove={draw}
+      onMouseLeave={finishDrawing}
+      ref={canvasRef}
+      style={{ border: '1px solid black', backgroundColor: 'white' }}
+    />
+  </>
+);
+
 };
 
 export default Whiteboard;
