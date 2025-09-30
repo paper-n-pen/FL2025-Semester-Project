@@ -2,7 +2,7 @@
 import { Routes, Route, Link } from 'react-router-dom';
 import Register from './Register';
 import Login from './Login';
-import Dashboard from './Dashboard'; // You’ll create this next
+import Dashboard from './Dashboard';
 
 function App() {
   return (
