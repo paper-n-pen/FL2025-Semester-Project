@@ -1,13 +1,26 @@
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import Whiteboard from './Whiteboard';
+import './App.css';
+
+function Home() {
+  return (
+    <>
+      <h1>Home</h1>
+      <Link to="/whiteboard">Go to Whiteboard</Link>
+    </>
+  );
+}
 
 function App() {
   return (
-    <>
-      <h1>Vite + React</h1>
-      {/* You can add your own component code here */}
-    </>
-  )
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/whiteboard" element={<Whiteboard />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;
 

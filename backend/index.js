@@ -1,30 +1,56 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const { Server } = require("socket.io");
+const http = require('http');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = 3000;
 
+// --- Middleware ---
 app.use(cors());
+app.use(express.json());
 
+// --- Database ---
 // PostgreSQL connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// --- Routes ---
 // Define a simple route
 app.get('/', async (req, res) => {
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
+    // Use pool.query for automatic connection handling
+    const result = await pool.query('SELECT NOW()');
     res.send(`Hello, Express! DB connected. Current time from DB: ${result.rows[0].now}`);
-    client.release();
   } catch (err) {
-    console.error(err);
+    console.error('Database query error:', err);
     res.status(500).send('Error connecting to database');
   }
 });
 
+// --- Socket.IO ---
+io.on('connection', (socket) => {
+  console.log('a user connected');
+  socket.on('drawing', (data) => {
+    console.log('Received drawing data:', data);
+    socket.broadcast.emit('drawing', data);
+  });
+  socket.on('disconnect', () => {
+    console.log('user disconnected');
+  });
+});
+
+// --- Server Startup ---
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
