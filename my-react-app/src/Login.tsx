@@ -1,6 +1,7 @@
-//my-react-app/src/Login.tsx
+// my-react-app/src/Login.tsx
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 interface LoginResponse {
@@ -11,19 +12,24 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate(); // <-- add this
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    try {
       const res = await axios.post<LoginResponse>('/api/login', { email, password });
       const token = res.data.token;
       localStorage.setItem('token', token);
+      navigate('/dashboard'); // <-- redirect after successful login
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed.');
+    }
   };
 
   return (
     <form onSubmit={handleLogin}>
       <input
         type="email"
-        name="email"
         placeholder="Email"
         value={email}
         onChange={e => setEmail(e.target.value)}
@@ -31,14 +37,13 @@ function Login() {
       />
       <input
         type="password"
-        name="password"
         placeholder="Password"
         value={password}
         onChange={e => setPassword(e.target.value)}
         required
       />
       <button type="submit">Login</button>
-      {error && <p>{error}</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
     </form>
   );
 }
