@@ -1,14 +1,15 @@
-// my-react-app/src/App.tsx
-import { Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Register from './Register';
 import Login from './Login';
 import Dashboard from './Dashboard';
+import Whiteboard from './Whiteboard';
+import './App.css';
 
-function App() {
+function Home() {
   return (
     <div>
       <nav>
-        <Link to="/">Home</Link> | <Link to="/register">Register</Link> | <Link to="/login">Login</Link>
+        <Link to="/">Home</Link> | <Link to="/register">Register</Link> | <Link to="/login">Login</Link> | <Link to="/whiteboard">Whiteboard</Link>
       </nav>
 
       <Routes>
@@ -16,6 +17,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/whiteboard" element={<Whiteboard />} />
       </Routes>
     </div>
   );

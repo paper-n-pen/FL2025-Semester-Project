@@ -2,26 +2,40 @@
 
 const express = require('express');
 const cors = require('cors');
-const { pool } = require('./db');   // reusing the same pool
+const { Server } = require("socket.io");
+const http = require('http');
 const authRoutes = require('./routes/auth');
 const loginRoutes = require('./routes/login');
 
-const app = express();  // 👈 must come before app.use
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const PORT = 3000;
 
-// Middleware
+// --- Middleware ---
 app.use(cors());
-app.use(express.json()); // Needed for JSON request bodies
+app.use(express.json());
 
-// Test route
+// --- Database ---
+// PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// --- Routes ---
+// Define a simple route
 app.get('/', async (req, res) => {
   try {
+    // Use pool.query for automatic connection handling
     const result = await pool.query('SELECT NOW()');
-    res.send(
-      `Hello, Express! DB connected. Current time from DB: ${result.rows[0].now}`
-    );
+    res.send(`Hello, Express! DB connected. Current time from DB: ${result.rows[0].now}`);
   } catch (err) {
-    console.error(err);
+    console.error('Database query error:', err);
     res.status(500).send('Error connecting to database');
   }
 });
@@ -30,6 +44,20 @@ app.get('/', async (req, res) => {
 app.use('/api', authRoutes);
 app.use('/api', loginRoutes);
 
-app.listen(PORT, () =>
-  console.log(`Server running on http://localhost:${PORT}`)
-);
+// --- Socket.IO ---
+io.on('connection', (socket) => {
+  console.log('a user connected');
+  socket.on('drawing', (data) => {
+    console.log('Received drawing data:', data);
+    socket.broadcast.emit('drawing', data);
+  });
+  socket.on('disconnect', () => {
+    console.log('user disconnected');
+  });
+});
+
+// --- Server Startup ---
+// Start server
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
