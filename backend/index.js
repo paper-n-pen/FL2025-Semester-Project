@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { Server } = require("socket.io");
 const http = require('http');
+const { Pool } = require('pg');
 const authRoutes = require('./routes/auth');
 const loginRoutes = require('./routes/login');
 

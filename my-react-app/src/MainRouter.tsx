@@ -1,20 +1,28 @@
-//my-react-app/src/MainRouter.tsx
+// my-react-app/src/MainRouter.tsx
 
-// import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+import App from './App';
 import Register from './Register';
 import Login from './Login';
-import App from './App';
+import Dashboard from './Dashboard';
+import Whiteboard from './Whiteboard';
 
 function MainRouter() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<App />}>
+          <Route index element={<h1>Home Page</h1>} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="whiteboard" element={<Whiteboard />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+        </Route>
+
       </Routes>
     </Router>
   );
 }
+
 export default MainRouter;

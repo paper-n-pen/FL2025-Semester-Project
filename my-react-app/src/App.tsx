@@ -1,24 +1,22 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import Register from './Register';
-import Login from './Login';
-import Dashboard from './Dashboard';
-import Whiteboard from './Whiteboard';
+// my-react-app/src/App.tsx
+
+import { Outlet, Link } from 'react-router-dom';
 import './App.css';
 
-function Home() {
+function App() {
   return (
     <div>
       <nav>
-        <Link to="/">Home</Link> | <Link to="/register">Register</Link> | <Link to="/login">Login</Link> | <Link to="/whiteboard">Whiteboard</Link>
+        <Link to="/">Home</Link> | 
+        <Link to="/dashboard">Dashboard</Link> | 
+        <Link to="/whiteboard">Whiteboard</Link> | 
+        <Link to="/login">Login</Link> | 
+        <Link to="/register">Register</Link>
       </nav>
 
-      <Routes>
-        <Route path="/" element={<h1>Home Page</h1>} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/whiteboard" element={<Whiteboard />} />
-      </Routes>
+      <main>
+        <Outlet />
+      </main>
     </div>
   );
 }
