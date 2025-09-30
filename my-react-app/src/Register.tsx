@@ -20,8 +20,12 @@ function Register() {
       setError('');
       // Redirect to login page after 1 second
       setTimeout(() => navigate('/login'), 1000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.message || 'Registration failed');
+      } else {
+        setError('An unexpected error occurred.');
+      }
       setSuccess('');
     }
   };

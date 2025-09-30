@@ -21,8 +21,12 @@ function Login() {
       const token = res.data.token;
       localStorage.setItem('token', token);
       navigate('/dashboard'); // <-- redirect after successful login
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed.');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.message || 'Login failed.');
+      } else {
+        setError('An unexpected error occurred.');
+      }
     }
   };
 
