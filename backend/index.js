@@ -1,8 +1,11 @@
+// backend/index.js
+
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
 const { Server } = require("socket.io");
 const http = require('http');
+const authRoutes = require('./routes/auth');
+const loginRoutes = require('./routes/login');
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +40,10 @@ app.get('/', async (req, res) => {
   }
 });
 
+// Mount routes at /api
+app.use('/api', authRoutes);
+app.use('/api', loginRoutes);
+
 // --- Socket.IO ---
 io.on('connection', (socket) => {
   console.log('a user connected');
@@ -52,5 +59,5 @@ io.on('connection', (socket) => {
 // --- Server Startup ---
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
