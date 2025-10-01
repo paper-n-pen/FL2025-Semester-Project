@@ -22,6 +22,12 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
+// Add a request logger to see all incoming requests
+app.use((req, res, next) => {
+  console.log(`Request received for: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // --- Database ---
 // PostgreSQL connection pool
 const pool = new Pool({
@@ -60,5 +66,5 @@ io.on('connection', (socket) => {
 // --- Server Startup ---
 // Start server
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
