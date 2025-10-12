@@ -7,6 +7,7 @@ const http = require('http');
 const { Pool } = require('pg');
 const authRoutes = require('./routes/auth');
 const loginRoutes = require('./routes/login');
+const postRoutes = require('./routes/posts');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,7 @@ const PORT = 3000;
 // --- Middleware ---
 app.use(cors());
 app.use(express.json());
+app.use('/api', postRoutes);
 
 // Add a request logger to see all incoming requests
 app.use((req, res, next) => {
