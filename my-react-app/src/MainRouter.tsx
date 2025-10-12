@@ -1,13 +1,13 @@
 // my-react-app/src/MainRouter.tsx
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
 import App from './App';
 import Register from './Register';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Whiteboard from './Whiteboard';
 import CreatePost from './CreatePost';
+import PostList from './PostList';
 
 function MainRouter() {
   return (
@@ -20,6 +20,7 @@ function MainRouter() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="create-post" element={<CreatePost />} />
+          <Route path="posts" element={<PostList />} />
         </Route>
 
       </Routes>

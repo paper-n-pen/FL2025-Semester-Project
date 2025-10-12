@@ -13,6 +13,7 @@ function App() {
         <Link to="/login">Login</Link> | 
         <Link to="/register">Register</Link> |
         <Link to="/create-post">Create Post</Link> |
+        <Link to="/posts">Posts</Link> |
       </nav>
 
       <main>

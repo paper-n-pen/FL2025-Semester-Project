@@ -1,3 +1,5 @@
+// my-react-app/src/CreatePost.tsx
+
 import { useState } from 'react';
 import axios from 'axios';
 
@@ -16,7 +18,7 @@ function CreatePost() {
 
     try {
       const res = await axios.post(
-        '/api/posts',
+        'http://localhost:3000/api/posts',
         { title, content },
         { headers: { Authorization: `Bearer ${token}` } }
       );
