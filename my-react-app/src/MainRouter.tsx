@@ -8,6 +8,7 @@ import Dashboard from './Dashboard';
 import Whiteboard from './Whiteboard';
 import CreatePost from './CreatePost';
 import PostList from './PostList';
+import PostPrePage from './PostPrePage';
 
 function MainRouter() {
   return (
@@ -21,6 +22,7 @@ function MainRouter() {
           <Route path="/login" element={<Login />} />
           <Route path="create-post" element={<CreatePost />} />
           <Route path="posts" element={<PostList />} />
+          <Route path="posts/:id" element={<PostPrePage />} />
         </Route>
 
       </Routes>

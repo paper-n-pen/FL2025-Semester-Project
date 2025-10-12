@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 interface Post {
   id: number;
@@ -35,10 +36,12 @@ function PostList() {
     <div style={{ maxWidth: 600, margin: '2rem auto' }}>
       <h2>All Posts</h2>
       {posts.map(post => (
-        <div key={post.id} style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
-          <h3>{post.title}</h3>
-          <p>{post.content}</p>
-          <p style={{ fontSize: '0.9rem', color: 'gray' }}>
+        <div key={post.id} style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem', borderRadius: '8px' }}>
+          <Link to={`/posts/${post.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h3 style={{ marginTop: 0 }}>{post.title}</h3>
+          </Link>
+          <p>{post.content.substring(0, 100)}...</p>
+          <p style={{ fontSize: '0.9rem', color: 'gray', marginBottom: 0 }}>
             By <strong>{post.username}</strong> on {new Date(post.created_at).toLocaleString()}
           </p>
         </div>

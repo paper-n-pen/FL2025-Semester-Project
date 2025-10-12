@@ -17,7 +17,8 @@ function CreatePost() {
     }
 
     try {
-      const res = await axios.post(
+      // const res = await axios.post(
+      await axios.post(
         'http://localhost:3000/api/posts',
         { title, content },
         { headers: { Authorization: `Bearer ${token}` } }

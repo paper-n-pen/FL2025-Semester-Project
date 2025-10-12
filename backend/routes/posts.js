@@ -57,4 +57,32 @@ router.get('/posts', async (req, res) => {
   }
 });
 
+/* -----------------------------------------------
+   GET /api/posts/:id   →  Fetch a single post
+------------------------------------------------- */
+router.get('/posts/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT posts.id, posts.title, posts.content, posts.created_at, users.username
+      FROM posts
+      JOIN users ON posts.user_id = users.id
+      WHERE posts.id = $1
+    `,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching post:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
