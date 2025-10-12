@@ -11,7 +11,8 @@ function App() {
         <Link to="/dashboard">Dashboard</Link> | 
         <Link to="/whiteboard">Whiteboard</Link> | 
         <Link to="/login">Login</Link> | 
-        <Link to="/register">Register</Link>
+        <Link to="/register">Register</Link> |
+        <Link to="/create-post">Create Post</Link> |
       </nav>
 
       <main>

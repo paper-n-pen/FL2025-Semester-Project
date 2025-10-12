@@ -7,6 +7,7 @@ import Register from './Register';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Whiteboard from './Whiteboard';
+import CreatePost from './CreatePost';
 
 function MainRouter() {
   return (
@@ -18,6 +19,7 @@ function MainRouter() {
           <Route path="whiteboard" element={<Whiteboard />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="create-post" element={<CreatePost />} />
         </Route>
 
       </Routes>
