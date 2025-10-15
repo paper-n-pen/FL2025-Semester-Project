@@ -20,8 +20,16 @@ router.post('/login', async (req, res) => {
     if (!validPassword) return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1h' });
-    console.log('User logged in:', { username: user.username, email });
-    res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
+    console.log('User logged in:', { username: user.username, email, userType: user.userType });
+    res.json({ 
+      token, 
+      user: { 
+        id: user.id, 
+        username: user.username, 
+        email: user.email, 
+        userType: user.userType 
+      } 
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

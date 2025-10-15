@@ -44,6 +44,10 @@ app.use('/api', loginRoutes);
 const { router: queriesRoutes, setIO } = require('./routes/queries');
 app.use('/api/queries', queriesRoutes);
 
+// Import and mount password reset routes
+const passwordResetRoutes = require('./routes/passwordReset');
+app.use('/api/auth', passwordResetRoutes);
+
 // Set up Socket.IO for queries
 setIO(io);
 
