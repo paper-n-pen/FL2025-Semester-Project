@@ -16,7 +16,7 @@ const TutorProfile = () => {
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
-  const availableSubjects = [
+  const _availableSubjects = [
     'Computer Science', 'Mathematics', 'Physics', 'Chemistry', 
     'Biology', 'English', 'History', 'Economics', 'Psychology'
   ];
@@ -70,7 +70,7 @@ const TutorProfile = () => {
 
     try {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await axios.put(`http://localhost:3000/api/tutor/profile`, {
+      const _response = await axios.put(`http://localhost:3000/api/tutor/profile`, {
         ...formData,
         userId: user.id
       });

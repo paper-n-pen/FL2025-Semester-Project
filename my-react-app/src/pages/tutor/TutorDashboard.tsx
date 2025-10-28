@@ -1,6 +1,6 @@
 // my-react-app/src/pages/tutor/TutorDashboard.tsx
 
-import React, { useState, useEffect } from 'react';
+import _React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import axios from 'axios';
@@ -20,7 +20,7 @@ interface StudentQuery {
 const TutorDashboard = () => {
   const [queries, setQueries] = useState<StudentQuery[]>([]);
   const [acceptedQueries, setAcceptedQueries] = useState<StudentQuery[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const navigate = useNavigate();
 

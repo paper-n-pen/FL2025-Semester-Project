@@ -9,6 +9,8 @@ const router = express.Router();
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log('POST /login endpoint hit');
+  console.log('Request body:', req.body);
 
   try {
     // Find user in memory storage
