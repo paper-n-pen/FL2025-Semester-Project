@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { storeAuthState, markActiveUserType } from '../../utils/authStorage';
 
 const StudentLogin = () => {
   const [formData, setFormData] = useState({
@@ -27,9 +28,11 @@ const StudentLogin = () => {
 
     try {
       const res = await axios.post('http://localhost:3000/api/login', formData);
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('userType', 'student');
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+
+      if (res.data?.user && res.data?.token) {
+        storeAuthState('student', res.data.token, res.data.user);
+        markActiveUserType('student');
+      }
       navigate('/student/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');

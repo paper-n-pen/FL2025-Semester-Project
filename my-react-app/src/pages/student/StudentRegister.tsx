@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { storeAuthState, markActiveUserType } from '../../utils/authStorage';
 
 const StudentRegister = () => {
   const [formData, setFormData] = useState({
@@ -34,12 +35,21 @@ const StudentRegister = () => {
     }
 
     try {
-      await axios.post('http://localhost:3000/api/register', {
+      const res = await axios.post('http://localhost:3000/api/register', {
         username: formData.username,
         email: formData.email,
         password: formData.password
       });
-      navigate('/student/login');
+
+      const { token, user } = res.data;
+
+      if (token && user) {
+        storeAuthState('student', token, user);
+        markActiveUserType('student');
+        navigate('/student/dashboard');
+      } else {
+        navigate('/student/login');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {

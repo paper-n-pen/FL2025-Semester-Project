@@ -4,10 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const { Server } = require("socket.io");
 const http = require('http');
-const { Pool } = require('pg');
 const authRoutes = require('./routes/auth');
 const loginRoutes = require('./routes/login');
-const postRoutes = require('./routes/posts');
+const { pool } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,8 +30,15 @@ app.use((req, res, next) => {
 });
 
 // --- Database ---
-// Skip database connection for MVP - using in-memory storage
-console.log('Running in MVP mode - using in-memory storage');
+(async () => {
+  try {
+    const client = await pool.connect();
+    client.release();
+    console.log('Database connection established');
+  } catch (error) {
+    console.error('Failed to connect to the database:', error);
+  }
+})();
 
 // --- Routes ---
 // Define a simple route
@@ -63,10 +69,15 @@ setIO(io);
 io.on('connection', (socket) => {
   console.log('a user connected');
   
-  // Handle drawing events
+  // Handle drawing events scoped to session rooms
   socket.on('drawing', (data) => {
-    console.log('Received drawing data:', data);
-    socket.broadcast.emit('drawing', data);
+    if (!data || !data.sessionId || !data.payload) {
+      return;
+    }
+
+    const { sessionId, payload } = data;
+    console.log(`Received drawing data for session ${sessionId}`);
+    socket.to(`session-${sessionId}`).emit('drawing', payload);
   });
   
   // Handle chat messages
@@ -85,10 +96,25 @@ io.on('connection', (socket) => {
     socket.join(`student-${studentId}`);
     console.log(`Student ${studentId} joined their room`);
   });
+
+  socket.on('leave-tutor-room', (tutorId) => {
+    socket.leave(`tutor-${tutorId}`);
+    console.log(`Tutor ${tutorId} left their room`);
+  });
+
+  socket.on('leave-student-room', (studentId) => {
+    socket.leave(`student-${studentId}`);
+    console.log(`Student ${studentId} left their room`);
+  });
   
   socket.on('join-session', (sessionId) => {
     socket.join(`session-${sessionId}`);
     console.log(`User joined session ${sessionId}`);
+  });
+
+  socket.on('leave-session', (sessionId) => {
+    socket.leave(`session-${sessionId}`);
+    console.log(`User left session ${sessionId}`);
   });
   
   socket.on('session-message', (data) => {

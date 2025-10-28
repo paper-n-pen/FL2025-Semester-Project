@@ -1,9 +1,10 @@
 // my-react-app/src/pages/student/StudentDashboard.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import axios from 'axios';
+import { getAuthStateForType, markActiveUserType, clearAuthState } from '../../utils/authStorage';
 
 const socket = io("http://localhost:3000");
 
@@ -20,6 +21,10 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [acceptedTutors, setAcceptedTutors] = useState<any[]>([]);
+  const [studentUser, setStudentUser] = useState<any>(() => {
+    const stored = getAuthStateForType('student');
+    return stored.user;
+  });
   const navigate = useNavigate();
 
   const subjects: Subject[] = [
@@ -45,36 +50,86 @@ const StudentDashboard = () => {
     }
   ];
 
+  const fetchTutorResponses = useCallback(async () => {
+    try {
+      if (!studentUser?.id) {
+        return;
+      }
+
+      const response = await axios.get(`http://localhost:3000/api/queries/student/${studentUser.id}/responses`);
+      const activeResponses = response.data.filter((item: any) => {
+        const status = item?.status?.toLowerCase?.() || '';
+        const sessionStatus = item?.sessionStatus?.toLowerCase?.() || '';
+        if (status === 'completed' || sessionStatus === 'ended') {
+          return false;
+        }
+        return true;
+      });
+      setAcceptedTutors(activeResponses);
+    } catch (error) {
+      console.error('Error fetching tutor responses:', error);
+    }
+  }, [studentUser?.id]);
+
   // Check authentication
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userType = localStorage.getItem('userType');
-    
-    if (!token || userType !== 'student') {
+    const stored = getAuthStateForType('student');
+    if (!stored.user) {
       navigate('/student/login');
+      return;
     }
+
+    markActiveUserType('student');
+    setStudentUser(stored.user);
   }, [navigate]);
 
   // Socket.IO for real-time notifications
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (studentUser?.id) {
+      socket.emit('join-student-room', studentUser.id);
+    }
     
-    socket.emit('join-student-room', user.id);
-    
-    socket.on('tutor-accepted', (data) => {
-      setAcceptedTutors(prev => [...prev, data]);
-      setNotifications(prev => [...prev, {
+    const acceptanceHandler = (data: any) => {
+      setNotifications((prev: any[]) => [...prev, {
         id: Date.now(),
         type: 'tutor-accepted',
         message: `${data.tutorName} accepted your query!`,
         data
       }]);
-    });
+      fetchTutorResponses();
+    };
+
+    socket.on('tutor-accepted', acceptanceHandler);
 
     return () => {
-      socket.off('tutor-accepted');
+      if (studentUser?.id) {
+        socket.emit('leave-student-room', studentUser.id);
+      }
+      socket.off('tutor-accepted', acceptanceHandler);
     };
-  }, []);
+  }, [fetchTutorResponses, studentUser?.id]);
+
+  useEffect(() => {
+    const sessionEndedHandler = (payload: any) => {
+      if (payload?.studentId && studentUser?.id && payload.studentId.toString() !== studentUser.id.toString()) {
+        return;
+      }
+
+      fetchTutorResponses();
+    };
+
+    socket.on('session-ended', sessionEndedHandler);
+
+    return () => {
+      socket.off('session-ended', sessionEndedHandler);
+    };
+  }, [fetchTutorResponses, studentUser?.id]);
+
+  useEffect(() => {
+    fetchTutorResponses();
+    const interval = setInterval(fetchTutorResponses, 5000);
+    return () => clearInterval(interval);
+  }, [fetchTutorResponses]);
 
   const currentSubject = subjects.find(s => s.name === selectedSubject);
 
@@ -85,14 +140,18 @@ const StudentDashboard = () => {
       return;
     }
 
+    if (!studentUser?.id) {
+      navigate('/student/login');
+      return;
+    }
+
     setLoading(true);
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
       const response = await axios.post('http://localhost:3000/api/queries/post', {
         subject: selectedSubject,
         subtopic: selectedSubtopic,
         query: query.trim(),
-        studentId: user.id
+        studentId: studentUser.id
       });
 
       if (response.data.message === 'Query posted successfully') {
@@ -109,15 +168,47 @@ const StudentDashboard = () => {
     }
   };
 
-  const handleAcceptTutor = (tutorData: any) => {
-    // Navigate to session room
-    navigate(`/session/${tutorData.queryId}`);
+  const handleAcceptTutor = async (tutorData: any) => {
+    try {
+      let destination = tutorData.sessionId;
+
+      if (!destination) {
+        if (!studentUser?.id) {
+          navigate('/student/login');
+          return;
+        }
+
+        const response = await axios.post('http://localhost:3000/api/queries/session', {
+          queryId: tutorData.queryId,
+          tutorId: tutorData.tutorId,
+          studentId: studentUser.id
+        });
+
+        destination = response.data.sessionId;
+
+        if (destination) {
+          await fetchTutorResponses();
+        }
+      }
+
+      if (destination) {
+        navigate(`/session/${destination}`);
+      } else {
+        alert('Session is not ready yet. Please wait for the tutor to start the session.');
+      }
+    } catch (error: any) {
+      console.error('Error starting session:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to start session. Please try again.';
+      alert(message);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('user');
+    if (studentUser?.id) {
+      socket.emit('leave-student-room', studentUser.id);
+    }
+    clearAuthState('student');
+    setStudentUser(null);
     navigate('/');
   };
 
@@ -282,14 +373,14 @@ const StudentDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {acceptedTutors.map((tutor, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-green-50">
+                    <div key={tutor.queryId || index} className="border border-gray-200 rounded-lg p-4 bg-green-50">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900 mb-1">
                             {tutor.tutorName}
                           </h3>
                           <p className="text-sm text-gray-600 mb-2">
-                            Rate: ${tutor.rate}/10 minutes
+                            Rate: {tutor.rate ? `$${tutor.rate}/10min` : 'N/A'}
                           </p>
                           {tutor.bio && (
                             <p className="text-sm text-gray-600 mb-2">
@@ -299,6 +390,26 @@ const StudentDashboard = () => {
                           {tutor.education && (
                             <p className="text-sm text-gray-500">
                               Education: {tutor.education}
+                            </p>
+                          )}
+                          {(tutor.subject || tutor.subtopic) && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {tutor.subject && `${tutor.subject}`} {tutor.subtopic && `• ${tutor.subtopic}`}
+                            </p>
+                          )}
+                          {tutor.query && (
+                            <p className="text-sm text-gray-600 mt-2 line-clamp-3">
+                              {tutor.query}
+                            </p>
+                          )}
+                          {tutor.status && (
+                            <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">
+                              Status: {tutor.status}
+                            </p>
+                          )}
+                          {tutor.sessionStatus && (
+                            <p className="text-xs text-gray-500">
+                              Session: {tutor.sessionStatus}
                             </p>
                           )}
                         </div>

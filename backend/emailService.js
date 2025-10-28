@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { pool } = require('./db');
 
 // Create transporter (using Gmail for demo - in production use proper SMTP)
 const transporter = nodemailer.createTransport({
@@ -8,9 +9,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS || 'your-app-password'
   }
 });
-
-// Password reset tokens storage (in production, use Redis or database)
-const resetTokens = new Map();
 
 const generateResetToken = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -59,38 +57,88 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   }
 };
 
-const storeResetToken = (email, token) => {
-  resetTokens.set(token, {
-    email,
-    timestamp: Date.now(),
-    used: false
-  });
+const storeResetToken = async (userId, token) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+    await client.query(
+      `INSERT INTO password_reset_tokens (token, user_id, expires_at, used, used_at)
+       VALUES ($1, $2, CURRENT_TIMESTAMP + INTERVAL '1 hour', FALSE, NULL)`,
+      [token, userId]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
-const validateResetToken = (token) => {
-  const tokenData = resetTokens.get(token);
-  if (!tokenData) return false;
-  
-  // Check if token is expired (1 hour)
-  const isExpired = Date.now() - tokenData.timestamp > 3600000; // 1 hour in milliseconds
-  if (isExpired) {
-    resetTokens.delete(token);
+const isTokenActive = (row) => {
+  if (!row) {
     return false;
   }
-  
-  return !tokenData.used;
-};
 
-const markTokenAsUsed = (token) => {
-  const tokenData = resetTokens.get(token);
-  if (tokenData) {
-    tokenData.used = true;
+  if (row.used) {
+    return false;
   }
+
+  const expiresAt = new Date(row.expires_at);
+  if (Number.isNaN(expiresAt.getTime())) {
+    return false;
+  }
+
+  return expiresAt.getTime() > Date.now();
 };
 
-const getEmailFromToken = (token) => {
-  const tokenData = resetTokens.get(token);
-  return tokenData ? tokenData.email : null;
+const validateResetToken = async (token) => {
+  const result = await pool.query(
+    `SELECT token, expires_at, used
+     FROM password_reset_tokens
+     WHERE token = $1`,
+    [token]
+  );
+
+  const tokenRow = result.rows[0];
+
+  if (!isTokenActive(tokenRow)) {
+    if (tokenRow && new Date(tokenRow.expires_at).getTime() <= Date.now()) {
+      await pool.query('DELETE FROM password_reset_tokens WHERE token = $1', [token]);
+    }
+    return false;
+  }
+
+  return true;
+};
+
+const markTokenAsUsed = async (token) => {
+  await pool.query(
+    `UPDATE password_reset_tokens
+     SET used = TRUE,
+         used_at = CURRENT_TIMESTAMP
+     WHERE token = $1`,
+    [token]
+  );
+};
+
+const getResetTokenUser = async (token) => {
+  const result = await pool.query(
+    `SELECT u.id, u.email, prt.expires_at, prt.used
+     FROM password_reset_tokens prt
+     JOIN users u ON u.id = prt.user_id
+     WHERE prt.token = $1`,
+    [token]
+  );
+
+  const row = result.rows[0];
+  if (!isTokenActive(row)) {
+    return null;
+  }
+
+  return { id: row.id, email: row.email };
 };
 
 module.exports = {
@@ -98,6 +146,6 @@ module.exports = {
   storeResetToken,
   validateResetToken,
   markTokenAsUsed,
-  getEmailFromToken,
+  getResetTokenUser,
   generateResetToken
 };

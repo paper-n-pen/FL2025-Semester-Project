@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { storeAuthState, markActiveUserType } from '../../utils/authStorage';
 
 const TutorSetup = () => {
   const [formData, setFormData] = useState({
@@ -42,7 +43,7 @@ const TutorSetup = () => {
     setFormData({
       ...formData,
       specialties: formData.specialties.includes(specialty)
-        ? formData.specialties.filter(s => s !== specialty)
+        ? formData.specialties.filter((s: string) => s !== specialty)
         : [...formData.specialties, specialty]
     });
   };
@@ -65,7 +66,7 @@ const TutorSetup = () => {
     }
 
     try {
-      await axios.post('http://localhost:3000/api/register', {
+      const res = await axios.post('http://localhost:3000/api/register', {
         username: formData.username,
         email: formData.email,
         password: formData.password,
@@ -75,7 +76,17 @@ const TutorSetup = () => {
         specialties: formData.specialties,
         ratePer10Min: formData.ratePer10Min
       });
-      navigate('/tutor/dashboard');
+
+      const { token, user } = res.data;
+
+      if (token && user) {
+        storeAuthState('tutor', token, user);
+        markActiveUserType('tutor');
+        navigate('/tutor/dashboard');
+        return;
+      }
+
+      navigate('/tutor/login');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
