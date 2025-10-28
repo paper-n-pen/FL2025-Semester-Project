@@ -21,7 +21,6 @@ const PORT = 3000;
 // --- Middleware ---
 app.use(cors());
 app.use(express.json());
-app.use('/api', postRoutes);
 
 // Add a request logger to see all incoming requests
 app.use((req, res, next) => {

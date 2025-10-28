@@ -1,11 +1,13 @@
 // my-react-app/src/pages/SessionRoom.tsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Whiteboard from '../Whiteboard';
 import io from 'socket.io-client';
 import axios from 'axios';
 import { getActiveAuthState, getAuthStateForType, markActiveUserType } from '../utils/authStorage';
+import { Box, Button, Container, Divider, Paper, TextField, Typography } from '@mui/material';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 
 const socket = io("http://localhost:3000");
 
@@ -21,7 +23,7 @@ export default function SessionRoom() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [user, setUser] = useState<{ id: string; username: string } | null>(
+  const [user, setUser] = useState<{ id: string; username: string; userType?: string } | null>(
     null
   );
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -138,10 +140,10 @@ export default function SessionRoom() {
 
     socket.emit('session-message', {
       sessionId,
-      message
+      message: msg
     });
 
-    setMessages((prev: Message[]) => [...prev, message]);
+    setMessages((prev: Message[]) => [...prev, msg]);
     setNewMessage('');
   };
 
@@ -174,7 +176,7 @@ export default function SessionRoom() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Box className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -197,85 +199,85 @@ export default function SessionRoom() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-64px)]">
-        {/* Whiteboard */}
-        <div className="flex-1">
-          <Whiteboard socket={socket} sessionId={sessionId} />
-        </div>
+    <Container className="flex h-[calc(100vh-64px)]">
+      {/* Whiteboard */}
+      <div className="flex-1">
+        <Whiteboard socket={socket} sessionId={sessionId} />
+      </div>
 
-        {/* ---------- Chat Panel ---------- */}
-        <Paper
-          elevation={5}
-          sx={{
-            p: 3,
-            borderRadius: 4,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={1} mb={2}>
-            <ChatBubbleOutlineIcon color="primary" />
-            <Typography variant="h5" fontWeight="bold">
-              Chat
-            </Typography>
-          </Box>
-          <Divider sx={{ mb: 2 }} />
+      {/* ---------- Chat Panel ---------- */}
+      <Paper
+        elevation={5}
+        sx={{
+          p: 3,
+          borderRadius: 4,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <ChatBubbleOutlineIcon color="primary" />
+          <Typography variant="h5" fontWeight="bold">
+            Chat
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 2 }} />
 
-          <Box flex={1} overflow="auto" mb={2}>
-            {messages.map((m) => (
+        <Box flex={1} overflow="auto" mb={2}>
+          {messages.map((m) => (
+            <Box
+              key={m.id}
+              display="flex"
+              justifyContent={
+                m.sender === user?.username ? "flex-end" : "flex-start"
+              }
+              mb={1}
+            >
               <Box
-                key={m.id}
-                display="flex"
-                justifyContent={
-                  m.sender === user?.username ? "flex-end" : "flex-start"
-                }
-                mb={1}
+                sx={{
+                  px: 2,
+                  py: 1,
+                  borderRadius: 2,
+                  bgcolor:
+                    m.sender === user?.username
+                      ? "primary.main"
+                      : "grey.200",
+                  color:
+                    m.sender === user?.username
+                      ? "common.white"
+                      : "text.primary",
+                  maxWidth: "80%",
+                }}
               >
-                <Box
-                  sx={{
-                    px: 2,
-                    py: 1,
-                    borderRadius: 2,
-                    bgcolor:
-                      m.sender === user?.username
-                        ? "primary.main"
-                        : "grey.200",
-                    color:
-                      m.sender === user?.username
-                        ? "common.white"
-                        : "text.primary",
-                    maxWidth: "80%",
-                  }}
-                >
-                  <Typography variant="body2">{m.text}</Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                    {m.sender} •{" "}
-                    {new Date(m.timestamp).toLocaleTimeString([], {
+                <Typography variant="body2">{m.text}</Typography>
+                <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                  {m.sender} •{" "}
+                  {new Date(m.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
-                    })}
-                  </Typography>
-                </Box>
+                  })}
+                </Typography>
               </Box>
-            ))}
-            <div ref={messagesEndRef} />
-          </Box>
+            </Box>
+          ))}
+          <div ref={messagesEndRef} />
+        </Box>
 
-          {/* Input */}
-          <Box component="form" onSubmit={sendMessage} display="flex" gap={1}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-            />
-            <Button variant="contained" color="primary" type="submit">
-              Send
-            </Button>
-          </Box>
-        </Paper>
-      </Container>
-    </Box>
+        {/* Input */}
+        <Box component="form" onSubmit={sendMessage} display="flex" gap={1}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+          />
+          <Button variant="contained" color="primary" type="submit">
+            Send
+          </Button>
+        </Box>
+      </Paper>
+    </Container>
+    </Box >
   );
 }
