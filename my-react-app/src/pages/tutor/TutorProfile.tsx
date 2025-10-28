@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { getAuthStateForType, storeAuthState, markActiveUserType } from '../../utils/authStorage';
 
 const TutorProfile = () => {
   const [formData, setFormData] = useState({
@@ -34,30 +35,33 @@ const TutorProfile = () => {
   ];
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (user.bio) {
+    const stored = getAuthStateForType('tutor');
+    if (stored.user) {
+      markActiveUserType('tutor');
       setFormData({
-        bio: user.bio || '',
-        education: user.education || '',
-        specialties: user.specialties || [],
-        ratePer10Min: user.ratePer10Min || 0
+        bio: stored.user.bio || '',
+        education: stored.user.education || '',
+        specialties: stored.user.specialties || [],
+        ratePer10Min: stored.user.ratePer10Min || 0
       });
+    } else {
+      navigate('/tutor/login');
     }
-  }, []);
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       [name]: name === 'ratePer10Min' ? Number(value) : value
     }));
   };
 
   const handleSpecialtyToggle = (specialty: string) => {
-    setFormData(prev => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       specialties: prev.specialties.includes(specialty)
-        ? prev.specialties.filter(s => s !== specialty)
+        ? prev.specialties.filter((s: string) => s !== specialty)
         : [...prev.specialties, specialty]
     }));
   };
@@ -69,15 +73,21 @@ const TutorProfile = () => {
     setSuccess('');
 
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const _response = await axios.put(`http://localhost:3000/api/tutor/profile`, {
+      const stored = getAuthStateForType('tutor');
+      if (!stored.user) {
+        navigate('/tutor/login');
+        return;
+      }
+
+      const _response = await axios.put('http://localhost:3000/api/queries/profile', {
         ...formData,
-        userId: user.id
+        userId: stored.user.id
       });
 
-      // Update local storage
-      const updatedUser = { ...user, ...formData };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      // Update the stored tutor profile
+      const updatedUser = { ...stored.user, ...formData };
+      storeAuthState('tutor', stored.token, updatedUser);
+      markActiveUserType('tutor');
 
       setSuccess('Profile updated successfully!');
       setTimeout(() => {

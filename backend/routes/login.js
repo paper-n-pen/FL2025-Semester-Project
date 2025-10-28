@@ -13,8 +13,7 @@ router.post('/login', async (req, res) => {
   console.log('Request body:', req.body);
 
   try {
-    // Find user in memory storage
-    const user = findUserByEmail(email);
+    const user = await findUserByEmail(email);
 
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
@@ -22,14 +21,21 @@ router.post('/login', async (req, res) => {
     if (!validPassword) return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1h' });
-    console.log('User logged in:', { username: user.username, email, userType: user.userType });
+    const userType = user.user_type || 'student';
+    console.log('User logged in:', { username: user.username, email, userType });
     res.json({ 
       token, 
       user: { 
         id: user.id, 
         username: user.username, 
         email: user.email, 
-        userType: user.userType 
+        userType,
+        bio: user.bio,
+        education: user.education,
+        specialties: user.specialties || [],
+        ratePer10Min: user.rate_per_10_min !== null && user.rate_per_10_min !== undefined
+          ? Number(user.rate_per_10_min)
+          : null
       } 
     });
   } catch (err) {

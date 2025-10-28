@@ -1,9 +1,11 @@
 // my-react-app/src/pages/SessionRoom.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Whiteboard from '../Whiteboard';
 import io from 'socket.io-client';
+import axios from 'axios';
+import { getActiveAuthState, getAuthStateForType, markActiveUserType } from '../utils/authStorage';
 
 const socket = io("http://localhost:3000");
 
@@ -22,25 +24,104 @@ const SessionRoom = () => {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!userData.id) {
+    const resolveUser = () => {
+      const activeState = getActiveAuthState();
+      if (activeState.user && activeState.userType) {
+        markActiveUserType(activeState.userType);
+        setUser({ ...activeState.user, userType: activeState.user.userType || activeState.userType });
+        return true;
+      }
+
+      const studentState = getAuthStateForType('student');
+      if (studentState.user) {
+        markActiveUserType('student');
+        setUser({ ...studentState.user, userType: studentState.user.userType || 'student' });
+        return true;
+      }
+
+      const tutorState = getAuthStateForType('tutor');
+      if (tutorState.user) {
+        markActiveUserType('tutor');
+        setUser({ ...tutorState.user, userType: tutorState.user.userType || 'tutor' });
+        return true;
+      }
+
+      return false;
+    };
+
+    if (!resolveUser()) {
       navigate('/');
       return;
     }
-    setUser(userData);
 
-    // Join session room
-    socket.emit('join-session', sessionId);
+    if (sessionId) {
+      socket.emit('join-session', sessionId);
+    }
 
-    // Listen for messages
-    socket.on('session-message', (message) => {
-      setMessages(prev => [...prev, message]);
-    });
+    const messageHandler = (message: Message) => {
+      setMessages((prev: Message[]) => [...prev, message]);
+    };
+
+    socket.on('session-message', messageHandler);
 
     return () => {
-      socket.off('session-message');
+      if (sessionId) {
+        socket.emit('leave-session', sessionId);
+      }
+      socket.off('session-message', messageHandler);
     };
   }, [sessionId, navigate]);
+
+  const redirectAfterSession = useCallback(() => {
+    if (user?.userType === 'tutor') {
+      navigate('/tutor/dashboard');
+      return;
+    }
+
+    if (user?.userType === 'student') {
+      navigate('/student/dashboard');
+      return;
+    }
+
+    const activeState = getActiveAuthState();
+    if (activeState.userType === 'tutor') {
+      navigate('/tutor/dashboard');
+      return;
+    }
+    if (activeState.userType === 'student') {
+      navigate('/student/dashboard');
+      return;
+    }
+
+    const studentState = getAuthStateForType('student');
+    if (studentState.user) {
+      navigate('/student/dashboard');
+      return;
+    }
+
+    const tutorState = getAuthStateForType('tutor');
+    if (tutorState.user) {
+      navigate('/tutor/dashboard');
+      return;
+    }
+
+    navigate('/');
+  }, [navigate, user]);
+
+  useEffect(() => {
+    const sessionEndedHandler = (payload: { sessionId: string; endedBy: string }) => {
+      if (payload?.sessionId?.toString() === sessionId?.toString()) {
+        alert('Session has ended. Returning to dashboard.');
+        redirectAfterSession();
+      }
+    };
+
+    socket.on('session-ended', sessionEndedHandler);
+
+    return () => {
+      socket.off('session-ended', sessionEndedHandler);
+    };
+  }, [sessionId, redirectAfterSession]);
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,13 +139,35 @@ const SessionRoom = () => {
       message
     });
 
-    setMessages(prev => [...prev, message]);
+    setMessages((prev: Message[]) => [...prev, message]);
     setNewMessage('');
   };
 
-  const handleEndSession = () => {
-    if (confirm('Are you sure you want to end this session?')) {
-      navigate('/student/dashboard');
+  const handleEndSession = async () => {
+    if (!sessionId || !user) {
+      return;
+    }
+
+    const confirmEnd = window.confirm('Are you sure you want to end this session?');
+    if (!confirmEnd) {
+      return;
+    }
+
+    try {
+      const sessionIdNumber = Number(sessionId);
+      if (!Number.isInteger(sessionIdNumber)) {
+        alert('Invalid session identifier.');
+        return;
+      }
+
+      await axios.post('http://localhost:3000/api/queries/session/end', {
+        sessionId: sessionIdNumber,
+        endedBy: user.id
+      });
+      redirectAfterSession();
+    } catch (error) {
+      console.error('Error ending session:', error);
+      alert('Failed to end session. Please try again.');
     }
   };
 
@@ -95,7 +198,7 @@ const SessionRoom = () => {
       <div className="flex h-[calc(100vh-64px)]">
         {/* Whiteboard */}
         <div className="flex-1">
-          <Whiteboard />
+          <Whiteboard socket={socket} sessionId={sessionId} />
         </div>
 
         {/* Chat Panel */}

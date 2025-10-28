@@ -1,20 +1,28 @@
 // my-react-app/src/pages/tutor/TutorDashboard.tsx
 
-import _React, { useState, useEffect } from 'react';
+import _React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import axios from 'axios';
+import { getAuthStateForType, markActiveUserType, clearAuthState } from '../../utils/authStorage';
 
 const socket = io("http://localhost:3000");
 
+const DECLINED_STORAGE_PREFIX = 'tutorDeclinedQueries';
+const getDeclinedStorageKey = (tutorId: number | string) => `${DECLINED_STORAGE_PREFIX}-${tutorId}`;
+
 interface StudentQuery {
   id: string;
+  studentId: number;
   studentName: string;
   subject: string;
   subtopic: string;
   query: string;
   timestamp: Date;
-  rate: number;
+  rate: number | null;
+  status?: string;
+  sessionId?: string | null;
+  sessionStatus?: string | null;
 }
 
 const TutorDashboard = () => {
@@ -22,45 +30,115 @@ const TutorDashboard = () => {
   const [acceptedQueries, setAcceptedQueries] = useState<StudentQuery[]>([]);
   const [_loading, _setLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const declinedQueryIdsRef = useRef<Set<string>>(new Set());
+  const [tutorUser, setTutorUser] = useState<any>(() => {
+    const stored = getAuthStateForType('tutor');
+    return stored.user;
+  });
   const navigate = useNavigate();
+
+  const fetchAcceptedQueries = useCallback(async () => {
+    try {
+      if (!tutorUser?.id) {
+        setAcceptedQueries([]);
+        return;
+      }
+
+      const response = await axios.get(`http://localhost:3000/api/queries/tutor/${tutorUser.id}/accepted-queries`);
+      setAcceptedQueries(response.data || []);
+    } catch (error) {
+      console.error('Error fetching accepted queries:', error);
+    }
+  }, [tutorUser?.id]);
+
+  const updateDeclinedStorage = useCallback(() => {
+    if (!tutorUser?.id) {
+      return;
+    }
+
+    const key = getDeclinedStorageKey(tutorUser.id);
+    const ids = Array.from(declinedQueryIdsRef.current);
+
+    if (ids.length === 0) {
+      localStorage.removeItem(key);
+      return;
+    }
+
+    localStorage.setItem(key, JSON.stringify(ids));
+  }, [tutorUser?.id]);
 
   // Check authentication
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userType = localStorage.getItem('userType');
-    
-    if (!token || userType !== 'tutor') {
+    const stored = getAuthStateForType('tutor');
+    if (!stored.user) {
       navigate('/tutor/setup');
+      return;
     }
+
+    markActiveUserType('tutor');
+    setTutorUser(stored.user);
   }, [navigate]);
+
+  useEffect(() => {
+    if (!tutorUser?.id) {
+      declinedQueryIdsRef.current = new Set();
+      return;
+    }
+
+    const key = getDeclinedStorageKey(tutorUser.id);
+    const raw = localStorage.getItem(key);
+
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        declinedQueryIdsRef.current = new Set(parsed);
+        setQueries((prev: StudentQuery[]) => prev.filter((item: StudentQuery) => !declinedQueryIdsRef.current.has(item.id)));
+      }
+    } catch (error) {
+      console.error('Failed to parse stored declined queries:', error);
+    }
+  }, [tutorUser?.id]);
 
   // Socket.IO for real-time notifications
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    socket.emit('join-tutor-room', user.id);
-    
-    socket.on('new-query', (query) => {
-      setNotifications(prev => [...prev, {
+    if (tutorUser?.id) {
+      socket.emit('join-tutor-room', tutorUser.id);
+    }
+
+    const newQueryHandler = (query: any) => {
+      setNotifications((prev: any[]) => [...prev, {
         id: Date.now(),
         type: 'new-query',
         message: `New query in ${query.subject}: ${query.subtopic}`,
         query
       }]);
-    });
+    };
+
+    socket.on('new-query', newQueryHandler);
 
     return () => {
-      socket.off('new-query');
+      if (tutorUser?.id) {
+        socket.emit('leave-tutor-room', tutorUser.id);
+      }
+      socket.off('new-query', newQueryHandler);
     };
-  }, []);
+  }, [tutorUser?.id]);
 
   // Fetch queries from backend
   useEffect(() => {
     const fetchQueries = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const response = await axios.get(`http://localhost:3000/api/queries/tutor/${user.id}`);
-        setQueries(response.data);
+        if (!tutorUser?.id) {
+          return;
+        }
+
+        const response = await axios.get(`http://localhost:3000/api/queries/tutor/${tutorUser.id}`);
+        const filtered = (response.data || []).filter((item: StudentQuery) => !declinedQueryIdsRef.current.has(item.id));
+        setQueries(filtered);
       } catch (error) {
         console.error('Error fetching queries:', error);
       }
@@ -69,24 +147,72 @@ const TutorDashboard = () => {
     fetchQueries();
     const interval = setInterval(fetchQueries, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [tutorUser?.id]);
+
+  useEffect(() => {
+    if (!tutorUser?.id) {
+      setAcceptedQueries([]);
+      return;
+    }
+
+    fetchAcceptedQueries();
+    const interval = setInterval(fetchAcceptedQueries, 5000);
+    return () => clearInterval(interval);
+  }, [tutorUser?.id, fetchAcceptedQueries]);
+
+  useEffect(() => {
+    const sessionEndedHandler = (payload: any) => {
+      if (!payload) {
+        return;
+      }
+
+      if (payload.tutorId && tutorUser?.id && payload.tutorId.toString() !== tutorUser.id.toString()) {
+        return;
+      }
+
+      setAcceptedQueries((prev: StudentQuery[]) =>
+        prev.filter((item: StudentQuery) => {
+          if (payload.queryId && item.id === payload.queryId) {
+            return false;
+          }
+
+          if (payload.sessionId && item.sessionId && item.sessionId === payload.sessionId) {
+            return false;
+          }
+
+          return true;
+        })
+      );
+
+      fetchAcceptedQueries();
+    };
+
+    socket.on('session-ended', sessionEndedHandler);
+
+    return () => {
+      socket.off('session-ended', sessionEndedHandler);
+    };
+  }, [fetchAcceptedQueries, tutorUser?.id]);
 
   const handleAcceptQuery = async (queryId: string) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!tutorUser?.id) {
+        navigate('/tutor/login');
+        return;
+      }
+
       const response = await axios.post('http://localhost:3000/api/queries/accept', {
         queryId,
-        tutorId: user.id.toString()
+        tutorId: tutorUser.id.toString()
       });
 
       if (response.data.message === 'Query accepted successfully') {
-        // Remove from pending queries
-        setQueries(prev => prev.filter(q => q.id !== queryId));
-        // Add to accepted queries
-        const acceptedQuery = queries.find(q => q.id === queryId);
-        if (acceptedQuery) {
-          setAcceptedQueries(prev => [...prev, acceptedQuery]);
-        }
+        declinedQueryIdsRef.current.delete(queryId);
+        updateDeclinedStorage();
+
+        setQueries((prev: StudentQuery[]) => prev.filter((q) => q.id !== queryId));
+
+        await fetchAcceptedQueries();
       }
     } catch (error: any) {
       console.error('Error accepting query:', error);
@@ -96,14 +222,44 @@ const TutorDashboard = () => {
   };
 
   const handleDeclineQuery = (queryId: string) => {
-    // Remove from pending queries
-    setQueries(prev => prev.filter(q => q.id !== queryId));
+    declinedQueryIdsRef.current.add(queryId);
+    updateDeclinedStorage();
+    setQueries((prev: StudentQuery[]) => prev.filter((q) => q.id !== queryId));
+  };
+
+  const handleStartSession = async (query: StudentQuery) => {
+    try {
+      const response = await axios.post('http://localhost:3000/api/queries/session', {
+        queryId: query.id,
+        tutorId: tutorUser.id,
+        studentId: query.studentId
+      });
+
+      const sessionId = response.data.sessionId;
+      if (sessionId) {
+        setAcceptedQueries((prev: StudentQuery[]) =>
+          prev.map((item: StudentQuery) =>
+            item.id === query.id ? { ...item, sessionId } : item
+          )
+        );
+        fetchAcceptedQueries();
+        navigate(`/session/${sessionId}`);
+      }
+    } catch (error: any) {
+      console.error('Error starting session:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to start session. Please try again.';
+      alert(message);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('user');
+    const tutorId = tutorUser?.id;
+    if (tutorId) {
+      socket.emit('leave-tutor-room', tutorId);
+    }
+    declinedQueryIdsRef.current.clear();
+    clearAuthState('tutor');
+    setTutorUser(null);
     navigate('/');
   };
 
@@ -278,7 +434,7 @@ const TutorDashboard = () => {
                       </div>
                       <div className="mt-4">
                         <button
-                          onClick={() => navigate(`/session/${query.id}`)}
+                          onClick={() => handleStartSession(query)}
                           className="w-full bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
                         >
                           Start Session

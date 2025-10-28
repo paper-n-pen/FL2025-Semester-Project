@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import io from 'socket.io-client';
 
-const socket = io("http://localhost:3000");
-
 // Define a more structured data type for drawing events
 interface Point {
     x: number;
@@ -17,7 +15,12 @@ type DrawData =
 
 type Tool = 'pen' | 'eraser';
 
-const Whiteboard = () => {
+interface WhiteboardProps {
+    socket?: any;
+    sessionId?: string;
+}
+
+const Whiteboard = ({ socket, sessionId }: WhiteboardProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const contextRef = useRef<CanvasRenderingContext2D | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -25,6 +28,16 @@ const Whiteboard = () => {
     const [brushSize, setBrushSize] = useState(5);
     const [brushColor, setBrushColor] = useState('#000000');
     const pointsRef = useRef<Point[]>([]);
+    const ownsSocket = !socket;
+    const [activeSocket] = useState(() => socket ?? io('http://localhost:3000'));
+
+    useEffect(() => {
+        return () => {
+            if (ownsSocket && activeSocket) {
+                activeSocket.disconnect();
+            }
+        };
+    }, [activeSocket, ownsSocket]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -72,12 +85,20 @@ const Whiteboard = () => {
             }
         };
 
-        socket.on('drawing', handleDrawing);
+        activeSocket.on('drawing', handleDrawing);
 
         return () => {
-            socket.off('drawing', handleDrawing);
+            activeSocket.off('drawing', handleDrawing);
         };
-    }, []);
+    }, [activeSocket]);
+
+    const emitDrawing = (payload: DrawData) => {
+        if (!sessionId) {
+            return;
+        }
+
+        activeSocket.emit('drawing', { sessionId, payload });
+    };
 
     const startDrawing = ({ nativeEvent }: React.MouseEvent<HTMLCanvasElement>) => {
         const { offsetX, offsetY } = nativeEvent;
@@ -98,7 +119,7 @@ const Whiteboard = () => {
             context.globalCompositeOperation = 'source-over';
             
             // Emit erase event
-            socket.emit('drawing', { type: 'erase', point: currentPoint });
+            emitDrawing({ type: 'erase', point: currentPoint });
         } else {
             // Draw a single point locally
             context.beginPath();
@@ -108,7 +129,7 @@ const Whiteboard = () => {
             context.closePath();
 
             // Emit the drawing event for the single point
-            socket.emit('drawing', { type: 'dot', point: currentPoint });
+            emitDrawing({ type: 'dot', point: currentPoint });
         }
     };
 
@@ -138,7 +159,7 @@ const Whiteboard = () => {
             context.globalCompositeOperation = 'source-over';
             
             // Emit erase event
-            socket.emit('drawing', { type: 'erase', point: currentPoint });
+            emitDrawing({ type: 'erase', point: currentPoint });
         } else {
             if (pointsRef.current.length > 2) {
                 const points = pointsRef.current;
@@ -160,7 +181,7 @@ const Whiteboard = () => {
                 context.closePath();
                 
                 // Emit the curve data
-                socket.emit('drawing', { 
+                emitDrawing({ 
                     type: 'curve', 
                     startPoint: prevMidPoint, 
                     midPoint: lastPoint, 
@@ -175,7 +196,7 @@ const Whiteboard = () => {
         const context = contextRef.current;
         if (!context) return;
         context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-        socket.emit('drawing', { type: 'clear' });
+        emitDrawing({ type: 'clear' });
     };
 
     const downloadCanvas = () => {

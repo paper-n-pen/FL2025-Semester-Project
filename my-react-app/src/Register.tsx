@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import axios, { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { storeAuthState, markActiveUserType } from './utils/authStorage';
+import type { SupportedUserType } from './utils/authStorage';
 
 function Register() {
   const [username, setUsername] = useState('');
@@ -15,10 +17,19 @@ function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post('/api/register', { username, email, password });
-      setSuccess('Registration successful!');
+      const res = await axios.post('/api/register', { username, email, password });
+      const { token, user } = res.data;
+
+      if (token && user) {
+        const normalizedType = (user.userType || 'student') as SupportedUserType;
+        storeAuthState(normalizedType, token, user);
+        markActiveUserType(normalizedType);
+        navigate(normalizedType === 'tutor' ? '/tutor/dashboard' : '/student/dashboard');
+        return;
+      }
+
+      setSuccess('Registration successful! Please log in.');
       setError('');
-      // Redirect to login page after 1 second
       setTimeout(() => navigate('/login'), 1000);
     } catch (err) {
       if (isAxiosError(err)) {
