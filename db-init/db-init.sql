@@ -60,6 +60,17 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_query_id ON sessions(query_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_tutor_id ON sessions(tutor_id);
 
+CREATE TABLE IF NOT EXISTS query_declines (
+  id BIGSERIAL PRIMARY KEY,
+  query_id BIGINT NOT NULL REFERENCES queries(id) ON DELETE CASCADE,
+  tutor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (query_id, tutor_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_query_declines_tutor ON query_declines(tutor_id);
+CREATE INDEX IF NOT EXISTS idx_query_declines_query ON query_declines(query_id);
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   token TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -8,9 +8,6 @@ import { getAuthStateForType, markActiveUserType, clearAuthState } from '../../u
 
 const socket = io("http://localhost:3000");
 
-const DECLINED_STORAGE_PREFIX = 'tutorDeclinedQueries';
-const getDeclinedStorageKey = (tutorId: number | string) => `${DECLINED_STORAGE_PREFIX}-${tutorId}`;
-
 interface StudentQuery {
   id: string;
   studentId: number;
@@ -51,22 +48,6 @@ const TutorDashboard = () => {
     }
   }, [tutorUser?.id]);
 
-  const updateDeclinedStorage = useCallback(() => {
-    if (!tutorUser?.id) {
-      return;
-    }
-
-    const key = getDeclinedStorageKey(tutorUser.id);
-    const ids = Array.from(declinedQueryIdsRef.current);
-
-    if (ids.length === 0) {
-      localStorage.removeItem(key);
-      return;
-    }
-
-    localStorage.setItem(key, JSON.stringify(ids));
-  }, [tutorUser?.id]);
-
   // Check authentication
   useEffect(() => {
     const stored = getAuthStateForType('tutor');
@@ -78,30 +59,6 @@ const TutorDashboard = () => {
     markActiveUserType('tutor');
     setTutorUser(stored.user);
   }, [navigate]);
-
-  useEffect(() => {
-    if (!tutorUser?.id) {
-      declinedQueryIdsRef.current = new Set();
-      return;
-    }
-
-    const key = getDeclinedStorageKey(tutorUser.id);
-    const raw = localStorage.getItem(key);
-
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        declinedQueryIdsRef.current = new Set(parsed);
-        setQueries((prev: StudentQuery[]) => prev.filter((item: StudentQuery) => !declinedQueryIdsRef.current.has(item.id)));
-      }
-    } catch (error) {
-      console.error('Failed to parse stored declined queries:', error);
-    }
-  }, [tutorUser?.id]);
 
   // Socket.IO for real-time notifications
   useEffect(() => {
@@ -208,7 +165,6 @@ const TutorDashboard = () => {
 
       if (response.data.message === 'Query accepted successfully') {
         declinedQueryIdsRef.current.delete(queryId);
-        updateDeclinedStorage();
 
         setQueries((prev: StudentQuery[]) => prev.filter((q) => q.id !== queryId));
 
@@ -221,10 +177,25 @@ const TutorDashboard = () => {
     }
   };
 
-  const handleDeclineQuery = (queryId: string) => {
-    declinedQueryIdsRef.current.add(queryId);
-    updateDeclinedStorage();
-    setQueries((prev: StudentQuery[]) => prev.filter((q) => q.id !== queryId));
+  const handleDeclineQuery = async (queryId: string) => {
+    try {
+      if (!tutorUser?.id) {
+        navigate('/tutor/login');
+        return;
+      }
+
+      await axios.post('http://localhost:3000/api/queries/decline', {
+        queryId,
+        tutorId: tutorUser.id
+      });
+
+      declinedQueryIdsRef.current.add(queryId);
+      setQueries((prev: StudentQuery[]) => prev.filter((q) => q.id !== queryId));
+    } catch (error: any) {
+      console.error('Error declining query:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to decline query. Please try again.';
+      alert(message);
+    }
   };
 
   const handleStartSession = async (query: StudentQuery) => {

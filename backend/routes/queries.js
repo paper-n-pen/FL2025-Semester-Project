@@ -106,12 +106,17 @@ router.get('/tutor/:tutorId', async (req, res) => {
     const tutorRow = tutorResult.rows[0];
     const tutorSpecialties = Array.isArray(tutorRow.specialties) ? tutorRow.specialties : [];
 
-    const queryParams = [];
+    const queryParams = [tutorId];
     let queryText = `SELECT q.id, q.subject, q.subtopic, q.query_text, q.student_id, q.status, q.created_at,
                             q.accepted_tutor_id, s.username AS student_name
                      FROM queries q
                      JOIN users s ON s.id = q.student_id
-                     WHERE q.status = 'pending'`;
+                     WHERE q.status = 'pending'
+                       AND NOT EXISTS (
+                         SELECT 1
+                         FROM query_declines d
+                         WHERE d.query_id = q.id AND d.tutor_id = $1
+                       )`;
 
     if (tutorSpecialties.length > 0) {
       queryParams.push(tutorSpecialties);
@@ -262,6 +267,12 @@ router.post('/accept', async (req, res) => {
       [queryIdNumber, tutorIdNumber]
     );
 
+    await client.query(
+      `DELETE FROM query_declines
+       WHERE query_id = $1 AND tutor_id = $2`,
+      [queryIdNumber, tutorIdNumber]
+    );
+
     await client.query('COMMIT');
 
     console.log('Tutor accepted query:', { queryId: queryIdNumber, tutorId: tutorIdNumber });
@@ -285,6 +296,32 @@ router.post('/accept', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   } finally {
     client.release();
+  }
+});
+
+router.post('/decline', async (req, res) => {
+  const { queryId, tutorId } = req.body;
+
+  const queryIdNumber = Number(queryId);
+  const tutorIdNumber = Number(tutorId);
+
+  if (!Number.isInteger(queryIdNumber) || !Number.isInteger(tutorIdNumber)) {
+    return res.status(400).json({ message: 'Invalid queryId or tutorId' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO query_declines (query_id, tutor_id)
+       VALUES ($1, $2)
+       ON CONFLICT (query_id, tutor_id) DO UPDATE
+       SET created_at = CURRENT_TIMESTAMP`,
+      [queryIdNumber, tutorIdNumber]
+    );
+
+    res.json({ message: 'Query declined successfully' });
+  } catch (error) {
+    console.error('Error declining query:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
