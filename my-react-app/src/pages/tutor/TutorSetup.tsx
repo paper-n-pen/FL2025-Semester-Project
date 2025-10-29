@@ -67,6 +67,14 @@ const TutorSetup = () => {
   const showPasswordFeedback = formData.confirmPassword.length > 0;
   const disableSubmit = loading || !passwordsMatch;
 
+  const toTwoDecimalNumber = (value: string) => {
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+    return Number(parsed.toFixed(2));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -85,6 +93,7 @@ const TutorSetup = () => {
     }
 
     try {
+      const normalizedRate = formData.ratePer10Min ? toTwoDecimalNumber(formData.ratePer10Min) : 0;
       const res = await axios.post('http://localhost:3000/api/register', {
         username: formData.username,
         email: formData.email,
@@ -93,13 +102,16 @@ const TutorSetup = () => {
         bio: formData.bio,
         education: formData.education,
         specialties: formData.specialties,
-        ratePer10Min: formData.ratePer10Min ? Number(formData.ratePer10Min) : 0
+        ratePer10Min: normalizedRate
       });
 
       const { token, user } = res.data;
 
       if (token && user) {
-        storeAuthState('tutor', token, user);
+        storeAuthState('tutor', token, {
+          ...user,
+          ratePer10Min: normalizedRate
+        });
         markActiveUserType('tutor');
         navigate('/tutor/dashboard');
         return;
@@ -259,14 +271,14 @@ const TutorSetup = () => {
                 value={formData.ratePer10Min}
                 onChange={handleChange}
                 className="input"
-                placeholder="e.g., 12.5"
+                placeholder="e.g., 12.50"
                 min="0"
-                step="0.1"
+                step="0.01"
                 max="100"
                 required
               />
             <p className="text-sm text-gray-500 mt-1">
-              Students pay in 10-minute blocks. Enter 0 for free sessions or use decimals like 12.5.
+              Students pay in 10-minute blocks. Enter 0 for free sessions.
             </p>
           </div>
 

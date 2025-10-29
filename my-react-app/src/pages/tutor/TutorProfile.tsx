@@ -45,7 +45,7 @@ const TutorProfile = () => {
         specialties: stored.user.specialties || [],
         ratePer10Min:
           stored.user.ratePer10Min !== undefined && stored.user.ratePer10Min !== null
-            ? String(stored.user.ratePer10Min)
+            ? Number(stored.user.ratePer10Min).toFixed(2)
             : ''
       });
     } else {
@@ -94,9 +94,10 @@ const TutorProfile = () => {
         return;
       }
 
+      const normalizedRate = formData.ratePer10Min ? Number(Number(formData.ratePer10Min).toFixed(2)) : 0;
       const _response = await axios.put('http://localhost:3000/api/queries/profile', {
         ...formData,
-        ratePer10Min: formData.ratePer10Min ? Number(formData.ratePer10Min) : 0,
+        ratePer10Min: normalizedRate,
         userId: stored.user.id
       });
 
@@ -104,7 +105,7 @@ const TutorProfile = () => {
       const updatedUser = {
         ...stored.user,
         ...formData,
-        ratePer10Min: formData.ratePer10Min ? Number(formData.ratePer10Min) : 0
+        ratePer10Min: normalizedRate
       };
       storeAuthState('tutor', stored.token, updatedUser);
       markActiveUserType('tutor');
@@ -221,14 +222,14 @@ const TutorProfile = () => {
                 value={formData.ratePer10Min}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 12.5"
+                placeholder="e.g., 12.50"
                 min="0"
-                step="0.1"
+                step="0.01"
                 max="100"
                 required
               />
               <p className="text-sm text-gray-500 mt-2">
-                Students will see this rate when you accept their queries. Enter 0 for free sessions or decimals like 12.5.
+                Students will see this rate when you accept their queries. Enter 0 for free sessions.
               </p>
             </div>
 
