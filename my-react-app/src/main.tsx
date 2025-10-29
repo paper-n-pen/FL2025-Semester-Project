@@ -1,9 +1,10 @@
 // src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import MainRouter from "./MainRouter";
 import { ThemeProvider, CssBaseline } from "@mui/material";
-import theme from "./theme"; // import the theme you just made
+import MainRouter from "./MainRouter";
+import theme from "./theme"; // centralized MUI theme
+import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -88,6 +88,7 @@ import {
   Avatar,
   Grid,
 } from "@mui/material";
+import { Link } from "react-router-dom";
 import SchoolIcon from "@mui/icons-material/School";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 
@@ -172,7 +173,8 @@ const Landing = () => {
                 color="info"
                 size="large"
                 sx={{ mb: 2, width: "100%" }}
-                href="/student/login"
+                component={Link}
+                to="/student/login"
               >
                 Login
               </Button>
@@ -181,7 +183,8 @@ const Landing = () => {
                 color="info"
                 size="large"
                 sx={{ width: "100%" }}
-                href="/student/register"
+                component={Link}
+                to="/student/register"
               >
                 Sign Up
               </Button>
@@ -216,7 +219,8 @@ const Landing = () => {
                 color="success"
                 size="large"
                 sx={{ mb: 2, width: "100%" }}
-                href="/tutor/login"
+                component={Link}
+                to="/tutor/login"
               >
                 Login
               </Button>
@@ -225,7 +229,8 @@ const Landing = () => {
                 color="success"
                 size="large"
                 sx={{ width: "100%" }}
-                href="/tutor/setup"
+                component={Link}
+                to="/tutor/setup"
               >
                 Sign Up
               </Button>
