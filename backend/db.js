@@ -10,7 +10,7 @@ const pool = new Pool({
   port: 5432,
 
   // altered by ai, not sure if is for docker settings
-  // connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL,
 });
 
 module.exports = { pool };
