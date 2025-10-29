@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { storeAuthState, markActiveUserType } from '../../utils/authStorage';
+import '../../styles/form-feedback.css';
 
 const StudentRegister = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,10 @@ const StudentRegister = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  const passwordsMatch =
+    formData.password.length > 0 && formData.password === formData.confirmPassword;
+  const showPasswordFeedback = formData.confirmPassword.length > 0;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -125,6 +130,11 @@ const StudentRegister = () => {
               placeholder="Confirm your password"
               required
             />
+            {showPasswordFeedback && (
+              <p className={`password-feedback ${passwordsMatch ? 'match' : 'mismatch'}`}>
+                {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -135,7 +145,7 @@ const StudentRegister = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !passwordsMatch}
             className="btn btn-primary w-full"
           >
             {loading ? 'Creating Account...' : 'Create Account'}

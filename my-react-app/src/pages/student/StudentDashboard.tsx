@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { getAuthStateForType, markActiveUserType, clearAuthState } from '../../utils/authStorage';
+import { getSocket, SOCKET_ENDPOINT } from '../../socket';
+import '../../styles/selectable-options.css';
 
-const socket = io("http://localhost:3000");
+const socket = getSocket();
 
 interface Subject {
   name: string;
@@ -56,7 +57,7 @@ const StudentDashboard = () => {
         return;
       }
 
-      const response = await axios.get(`http://localhost:3000/api/queries/student/${studentUser.id}/responses`);
+  const response = await axios.get(`${SOCKET_ENDPOINT}/api/queries/student/${studentUser.id}/responses`);
       const activeResponses = response.data.filter((item: any) => {
         const status = item?.status?.toLowerCase?.() || '';
         const sessionStatus = item?.sessionStatus?.toLowerCase?.() || '';
@@ -147,7 +148,7 @@ const StudentDashboard = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/api/queries/post', {
+  const response = await axios.post(`${SOCKET_ENDPOINT}/api/queries/post`, {
         subject: selectedSubject,
         subtopic: selectedSubtopic,
         query: query.trim(),
@@ -178,7 +179,7 @@ const StudentDashboard = () => {
           return;
         }
 
-        const response = await axios.post('http://localhost:3000/api/queries/session', {
+  const response = await axios.post(`${SOCKET_ENDPOINT}/api/queries/session`, {
           queryId: tutorData.queryId,
           tutorId: tutorData.tutorId,
           studentId: studentUser.id
@@ -281,24 +282,24 @@ const StudentDashboard = () => {
                     Select Subject
                   </label>
                   <div className="grid grid-cols-2 gap-3">
-                    {subjects.map((subject) => (
-                      <button
-                        key={subject.name}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubject(subject.name);
-                          setSelectedSubtopic('');
-                        }}
-                        className={`p-4 rounded-lg border-2 transition-all ${
-                          selectedSubject === subject.name
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="text-2xl mb-2">{subject.icon}</div>
-                        <div className="font-medium text-gray-900">{subject.name}</div>
-                      </button>
-                    ))}
+                    {subjects.map((subject) => {
+                      const isSelected = selectedSubject === subject.name;
+                      return (
+                        <button
+                          key={subject.name}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => {
+                            setSelectedSubject(subject.name);
+                            setSelectedSubtopic('');
+                          }}
+                          className={`selectable-card${isSelected ? ' is-selected' : ''}`}
+                        >
+                          <div className="selectable-icon">{subject.icon}</div>
+                          <div className="selectable-title">{subject.name}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -309,20 +310,20 @@ const StudentDashboard = () => {
                       Select Subtopic
                     </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {currentSubject.subtopics.map((subtopic) => (
-                        <button
-                          key={subtopic}
-                          type="button"
-                          onClick={() => setSelectedSubtopic(subtopic)}
-                          className={`px-4 py-2 rounded-lg border transition-all ${
-                            selectedSubtopic === subtopic
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          {subtopic}
-                        </button>
-                      ))}
+                      {currentSubject.subtopics.map((subtopic) => {
+                        const isSelected = selectedSubtopic === subtopic;
+                        return (
+                          <button
+                            key={subtopic}
+                            type="button"
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedSubtopic(subtopic)}
+                            className={`selectable-chip${isSelected ? ' is-selected' : ''}`}
+                          >
+                            {subtopic}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

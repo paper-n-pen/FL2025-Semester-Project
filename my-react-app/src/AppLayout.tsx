@@ -1,9 +1,49 @@
-import React from "react";
+import React, { useCallback, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Box, Container, AppBar, Toolbar, Typography, Avatar, Button } from "@mui/material";
+import { clearAllAuthStates, getActiveAuthState, markActiveUserType } from "./utils/authStorage";
 
 export default function AppLayout() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return () => undefined;
+    }
+
+    const handleUnload = () => {
+      const { user, userType } = getActiveAuthState();
+      if (user && userType) {
+        clearAllAuthStates();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+    window.addEventListener("pagehide", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      window.removeEventListener("pagehide", handleUnload);
+    };
+  }, []);
+
+  const handleHomeNavigation = useCallback(() => {
+    const { user, userType } = getActiveAuthState();
+
+    if (user && userType === "student") {
+      markActiveUserType("student");
+      navigate("/student/dashboard");
+      return;
+    }
+
+    if (user && userType === "tutor") {
+      markActiveUserType("tutor");
+      navigate("/tutor/dashboard");
+      return;
+    }
+
+    navigate("/");
+  }, [navigate]);
 
   return (
     <Box
@@ -22,7 +62,7 @@ export default function AppLayout() {
               MicroTutor
             </Typography>
           </Box>
-          <Button variant="outlined" color="primary" onClick={() => navigate("/")}>
+          <Button variant="outlined" color="primary" onClick={handleHomeNavigation}>
             Home
           </Button>
         </Toolbar>

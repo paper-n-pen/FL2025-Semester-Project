@@ -597,6 +597,16 @@ router.put('/profile', async (req, res) => {
     ? Number(ratePer10Min)
     : null;
 
+  if (sanitizedRate !== null) {
+    if (Number.isNaN(sanitizedRate)) {
+      return res.status(400).json({ message: 'ratePer10Min must be a valid number' });
+    }
+
+    if (sanitizedRate < 0) {
+      return res.status(400).json({ message: 'ratePer10Min must be non-negative' });
+    }
+  }
+
   try {
     const updateResult = await pool.query(
       `UPDATE users

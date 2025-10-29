@@ -4,13 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getAuthStateForType, storeAuthState, markActiveUserType } from '../../utils/authStorage';
+import '../../styles/selectable-options.css';
 
 const TutorProfile = () => {
   const [formData, setFormData] = useState({
     bio: '',
     education: '',
     specialties: [] as string[],
-    ratePer10Min: 0
+    ratePer10Min: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +43,10 @@ const TutorProfile = () => {
         bio: stored.user.bio || '',
         education: stored.user.education || '',
         specialties: stored.user.specialties || [],
-        ratePer10Min: stored.user.ratePer10Min || 0
+        ratePer10Min:
+          stored.user.ratePer10Min !== undefined && stored.user.ratePer10Min !== null
+            ? String(stored.user.ratePer10Min)
+            : ''
       });
     } else {
       navigate('/tutor/login');
@@ -51,9 +55,20 @@ const TutorProfile = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+
+    if (name === 'ratePer10Min') {
+      if (value === '' || /^\d*(?:\.\d{0,2})?$/.test(value)) {
+        setFormData((prev: typeof formData) => ({
+          ...prev,
+          ratePer10Min: value
+        }));
+      }
+      return;
+    }
+
     setFormData((prev: typeof formData) => ({
       ...prev,
-      [name]: name === 'ratePer10Min' ? Number(value) : value
+      [name]: value
     }));
   };
 
@@ -81,11 +96,16 @@ const TutorProfile = () => {
 
       const _response = await axios.put('http://localhost:3000/api/queries/profile', {
         ...formData,
+        ratePer10Min: formData.ratePer10Min ? Number(formData.ratePer10Min) : 0,
         userId: stored.user.id
       });
 
       // Update the stored tutor profile
-      const updatedUser = { ...stored.user, ...formData };
+      const updatedUser = {
+        ...stored.user,
+        ...formData,
+        ratePer10Min: formData.ratePer10Min ? Number(formData.ratePer10Min) : 0
+      };
       storeAuthState('tutor', stored.token, updatedUser);
       markActiveUserType('tutor');
 
@@ -170,20 +190,20 @@ const TutorProfile = () => {
                 Specialties (Select all that apply)
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {availableSpecialties.map((specialty) => (
-                  <button
-                    key={specialty}
-                    type="button"
-                    onClick={() => handleSpecialtyToggle(specialty)}
-                    className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-                      formData.specialties.includes(specialty)
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {specialty}
-                  </button>
-                ))}
+                {availableSpecialties.map((specialty) => {
+                  const isSelected = formData.specialties.includes(specialty);
+                  return (
+                    <button
+                      key={specialty}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => handleSpecialtyToggle(specialty)}
+                      className={`selectable-pill${isSelected ? ' is-selected' : ''}`}
+                    >
+                      {specialty}
+                    </button>
+                  );
+                })}
               </div>
               <p className="text-sm text-gray-500 mt-2">
                 Selected: {formData.specialties.length} specialties
@@ -201,13 +221,14 @@ const TutorProfile = () => {
                 value={formData.ratePer10Min}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 15"
-                min="1"
+                placeholder="e.g., 12.5"
+                min="0"
+                step="0.1"
                 max="100"
                 required
               />
               <p className="text-sm text-gray-500 mt-2">
-                Students will see this rate when you accept their queries
+                Students will see this rate when you accept their queries. Enter 0 for free sessions or decimals like 12.5.
               </p>
             </div>
 

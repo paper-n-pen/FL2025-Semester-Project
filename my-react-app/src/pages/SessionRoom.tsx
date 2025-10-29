@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Avatar,
@@ -13,10 +13,11 @@ import {
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import DrawIcon from "@mui/icons-material/Draw";
 import axios from "axios";
-import io, { Socket } from "socket.io-client";
-
 import Whiteboard from "../Whiteboard";
 import { getActiveAuthState, getAuthStateForType, markActiveUserType } from "../utils/authStorage";
+import { getSocket, SOCKET_ENDPOINT } from "../socket";
+import type { SessionSocket } from "../socket";
+import type { SupportedUserType } from "../utils/authStorage";
 
 interface AuthenticatedUser {
   id: number;
@@ -31,8 +32,6 @@ interface Message {
   timestamp: string | Date;
 }
 
-const SOCKET_ENDPOINT = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:3000";
-
 export default function SessionRoom() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -40,7 +39,8 @@ export default function SessionRoom() {
   const [newMessage, setNewMessage] = useState("");
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+
+  const sessionSocket = useMemo<SessionSocket>(() => getSocket(), []);
 
   const redirectAfterSession = useCallback(() => {
     if (user?.userType === "tutor") {
@@ -80,31 +80,57 @@ export default function SessionRoom() {
   }, [navigate, user]);
 
   useEffect(() => {
-    if (!socketRef.current) {
-      socketRef.current = io(SOCKET_ENDPOINT, { withCredentials: true });
-    }
+    const activeSocket = sessionSocket;
 
-    const socket = socketRef.current;
+    const ensureUserState = (candidate: AuthenticatedUser) => {
+      setUser((previous: AuthenticatedUser | null) => {
+        if (previous && previous.id === candidate.id && previous.username === candidate.username && previous.userType === candidate.userType) {
+          return previous;
+        }
+        return candidate;
+      });
+    };
+
+    const resolveSupportedUserType = (value?: string | null): SupportedUserType | null => {
+      return value === "student" || value === "tutor" ? value : null;
+    };
 
     const resolveUser = () => {
       const activeState = getActiveAuthState();
       if (activeState.user && activeState.userType) {
-        markActiveUserType(activeState.userType);
-        setUser({ ...activeState.user, userType: activeState.user.userType ?? activeState.userType });
+        const resolvedUser: AuthenticatedUser = {
+          ...activeState.user,
+          userType: activeState.user.userType ?? activeState.userType,
+        };
+        const supportedType = resolveSupportedUserType(resolvedUser.userType ?? activeState.userType);
+        if (supportedType) {
+          markActiveUserType(supportedType);
+          ensureUserState({ ...resolvedUser, userType: supportedType });
+          return true;
+        }
+        ensureUserState(resolvedUser);
         return true;
       }
 
       const studentState = getAuthStateForType("student");
       if (studentState.user) {
+        const resolvedUser: AuthenticatedUser = {
+          ...studentState.user,
+          userType: studentState.user.userType ?? "student",
+        };
         markActiveUserType("student");
-        setUser({ ...studentState.user, userType: studentState.user.userType ?? "student" });
+        ensureUserState(resolvedUser);
         return true;
       }
 
       const tutorState = getAuthStateForType("tutor");
       if (tutorState.user) {
+        const resolvedUser: AuthenticatedUser = {
+          ...tutorState.user,
+          userType: tutorState.user.userType ?? "tutor",
+        };
         markActiveUserType("tutor");
-        setUser({ ...tutorState.user, userType: tutorState.user.userType ?? "tutor" });
+        ensureUserState(resolvedUser);
         return true;
       }
 
@@ -116,12 +142,20 @@ export default function SessionRoom() {
       return () => undefined;
     }
 
-    if (sessionId) {
-      socket.emit("join-session", sessionId);
+    const handleConnect = () => {
+      if (sessionId) {
+        activeSocket.emit("join-session", sessionId);
+      }
+    };
+
+    if (activeSocket.connected) {
+      handleConnect();
     }
 
+    activeSocket.on("connect", handleConnect);
+
     const handleIncomingMessage = (message: Message) => {
-      setMessages((prev) => [...prev, message]);
+      setMessages((previousMessages: Message[]) => [...previousMessages, message]);
     };
 
     const handleSessionEnded = (payload: { sessionId: string; endedBy: string }) => {
@@ -131,17 +165,34 @@ export default function SessionRoom() {
       }
     };
 
-    socket.on("session-message", handleIncomingMessage);
-    socket.on("session-ended", handleSessionEnded);
+    const messageListener = (...args: unknown[]) => {
+      const [incoming] = args as [Message | undefined];
+      if (!incoming) {
+        return;
+      }
+      handleIncomingMessage(incoming);
+    };
+
+    const sessionEndedListener = (...args: unknown[]) => {
+      const [incoming] = args as [{ sessionId: string; endedBy: string } | undefined];
+      if (!incoming) {
+        return;
+      }
+      handleSessionEnded(incoming);
+    };
+
+    activeSocket.on("session-message", messageListener);
+    activeSocket.on("session-ended", sessionEndedListener);
 
     return () => {
       if (sessionId) {
-        socket.emit("leave-session", sessionId);
+        activeSocket.emit("leave-session", sessionId);
       }
-      socket.off("session-message", handleIncomingMessage);
-      socket.off("session-ended", handleSessionEnded);
+      activeSocket.off("connect", handleConnect);
+      activeSocket.off("session-message", messageListener);
+      activeSocket.off("session-ended", sessionEndedListener);
     };
-  }, [sessionId, navigate, redirectAfterSession]);
+  }, [sessionId, navigate, redirectAfterSession, sessionSocket]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -149,7 +200,7 @@ export default function SessionRoom() {
 
   const sendMessage = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newMessage.trim() || !user) {
+    if (!newMessage.trim() || !user || !sessionId) {
       return;
     }
 
@@ -160,10 +211,10 @@ export default function SessionRoom() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, message]);
+    setMessages((previousMessages: Message[]) => [...previousMessages, message]);
     setNewMessage("");
 
-    socketRef.current?.emit("session-message", {
+    sessionSocket.emit("session-message", {
       sessionId,
       message,
     });
@@ -248,7 +299,7 @@ export default function SessionRoom() {
           </Box>
           <Divider sx={{ mb: 2 }} />
           <Box flex={1} minHeight={400}>
-            <Whiteboard socket={socketRef.current} sessionId={sessionId} />
+            <Whiteboard socket={sessionSocket} sessionId={sessionId} />
           </Box>
         </Paper>
 
@@ -270,7 +321,7 @@ export default function SessionRoom() {
           <Divider sx={{ mb: 2 }} />
 
           <Box flex={1} overflow="auto" mb={2}>
-            {messages.map((message) => {
+            {messages.map((message: Message) => {
               const isOwnMessage = message.sender === user?.username;
               const timestamp = new Date(message.timestamp);
               const formattedTime = Number.isNaN(timestamp.getTime())
@@ -307,7 +358,7 @@ export default function SessionRoom() {
               size="small"
               placeholder="Type a message..."
               value={newMessage}
-              onChange={(event) => setNewMessage(event.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => setNewMessage(event.target.value)}
             />
             <Button variant="contained" color="primary" type="submit">
               Send

@@ -37,8 +37,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Please provide at least one specialty for tutor registration' });
     }
 
-    if (ratePer10Min === undefined || ratePer10Min === null || Number(ratePer10Min) <= 0) {
-      return res.status(400).json({ message: 'Tutor profile requires a positive ratePer10Min value' });
+    if (
+      ratePer10Min === undefined ||
+      ratePer10Min === null ||
+      Number.isNaN(Number(ratePer10Min)) ||
+      Number(ratePer10Min) < 0
+    ) {
+      return res.status(400).json({ message: 'Tutor profile requires a non-negative ratePer10Min value' });
     }
   }
 
