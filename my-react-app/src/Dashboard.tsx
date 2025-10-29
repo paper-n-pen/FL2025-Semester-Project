@@ -1,3 +1,5 @@
+// my-react-app/src/Dashboard.tsx
+
 // import React from 'react';
 
 const DashboardPage = () => {
