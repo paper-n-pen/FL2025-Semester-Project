@@ -1,0 +1,25 @@
+.password-feedback {
+  font-size: 0.82rem;
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.password-feedback::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  display: inline-block;
+  background-color: currentColor;
+  opacity: 0.85;
+}
+
+.password-feedback.match {
+  color: #16a34a;
+}
+
+.password-feedback.mismatch {
+  color: #dc2626;
+}

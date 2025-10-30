@@ -1,21 +1,35 @@
-// my-react-app/src/pages/SessionRoom.tsx
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  Avatar,
+  Box,
+  Button,
+  Container,
+  Divider,
+  Paper,
+  TextField,
+  Typography,
+} from "@mui/material";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import DrawIcon from "@mui/icons-material/Draw";
+import axios from "axios";
+import Whiteboard from "../Whiteboard";
+import { getActiveAuthState, getAuthStateForType, markActiveUserType } from "../utils/authStorage";
+import { getSocket, SOCKET_ENDPOINT } from "../socket";
+import type { SessionSocket } from "../socket";
+import type { SupportedUserType } from "../utils/authStorage";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Whiteboard from '../Whiteboard';
-import io from 'socket.io-client';
-import axios from 'axios';
-import { getActiveAuthState, getAuthStateForType, markActiveUserType } from '../utils/authStorage';
-import { Box, Button, Container, Divider, Paper, TextField, Typography } from '@mui/material';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-
-const socket = io("http://localhost:3000");
+interface AuthenticatedUser {
+  id: number;
+  username: string;
+  userType?: string;
+}
 
 interface Message {
   id: string;
   text: string;
   sender: string;
-  timestamp: string;
+  timestamp: string | Date;
 }
 
 export default function SessionRoom() {
@@ -23,31 +37,100 @@ export default function SessionRoom() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [user, setUser] = useState<{ id: string; username: string; userType?: string } | null>(
-    null
-  );
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const sessionSocket = useMemo<SessionSocket>(() => getSocket(), []);
+
+  const redirectAfterSession = useCallback(() => {
+    if (user?.userType === "tutor") {
+      navigate("/tutor/dashboard");
+      return;
+    }
+
+    if (user?.userType === "student") {
+      navigate("/student/dashboard");
+      return;
+    }
+
+    const activeState = getActiveAuthState();
+    if (activeState.userType === "tutor") {
+      navigate("/tutor/dashboard");
+      return;
+    }
+
+    if (activeState.userType === "student") {
+      navigate("/student/dashboard");
+      return;
+    }
+
+    const studentState = getAuthStateForType("student");
+    if (studentState.user) {
+      navigate("/student/dashboard");
+      return;
+    }
+
+    const tutorState = getAuthStateForType("tutor");
+    if (tutorState.user) {
+      navigate("/tutor/dashboard");
+      return;
+    }
+
+    navigate("/");
+  }, [navigate, user]);
 
   useEffect(() => {
+    const activeSocket = sessionSocket;
+
+    const ensureUserState = (candidate: AuthenticatedUser) => {
+      setUser((previous: AuthenticatedUser | null) => {
+        if (previous && previous.id === candidate.id && previous.username === candidate.username && previous.userType === candidate.userType) {
+          return previous;
+        }
+        return candidate;
+      });
+    };
+
+    const resolveSupportedUserType = (value?: string | null): SupportedUserType | null => {
+      return value === "student" || value === "tutor" ? value : null;
+    };
+
     const resolveUser = () => {
       const activeState = getActiveAuthState();
       if (activeState.user && activeState.userType) {
-        markActiveUserType(activeState.userType);
-        setUser({ ...activeState.user, userType: activeState.user.userType || activeState.userType });
+        const resolvedUser: AuthenticatedUser = {
+          ...activeState.user,
+          userType: activeState.user.userType ?? activeState.userType,
+        };
+        const supportedType = resolveSupportedUserType(resolvedUser.userType ?? activeState.userType);
+        if (supportedType) {
+          markActiveUserType(supportedType);
+          ensureUserState({ ...resolvedUser, userType: supportedType });
+          return true;
+        }
+        ensureUserState(resolvedUser);
         return true;
       }
 
-      const studentState = getAuthStateForType('student');
+      const studentState = getAuthStateForType("student");
       if (studentState.user) {
-        markActiveUserType('student');
-        setUser({ ...studentState.user, userType: studentState.user.userType || 'student' });
+        const resolvedUser: AuthenticatedUser = {
+          ...studentState.user,
+          userType: studentState.user.userType ?? "student",
+        };
+        markActiveUserType("student");
+        ensureUserState(resolvedUser);
         return true;
       }
 
-      const tutorState = getAuthStateForType('tutor');
+      const tutorState = getAuthStateForType("tutor");
       if (tutorState.user) {
-        markActiveUserType('tutor');
-        setUser({ ...tutorState.user, userType: tutorState.user.userType || 'tutor' });
+        const resolvedUser: AuthenticatedUser = {
+          ...tutorState.user,
+          userType: tutorState.user.userType ?? "tutor",
+        };
+        markActiveUserType("tutor");
+        ensureUserState(resolvedUser);
         return true;
       }
 
@@ -55,96 +138,86 @@ export default function SessionRoom() {
     };
 
     if (!resolveUser()) {
-      navigate('/');
-      return;
+      navigate("/");
+      return () => undefined;
     }
 
-    if (sessionId) {
-      socket.emit('join-session', sessionId);
-    }
-
-    const messageHandler = (message: Message) => {
-      setMessages((prev: Message[]) => [...prev, message]);
-    };
-
-    socket.on('session-message', messageHandler);
-
-    return () => {
+    const handleConnect = () => {
       if (sessionId) {
-        socket.emit('leave-session', sessionId);
+        activeSocket.emit("join-session", sessionId);
       }
-      socket.off('session-message', messageHandler);
     };
-  }, [sessionId, navigate]);
 
-  const redirectAfterSession = useCallback(() => {
-    if (user?.userType === 'tutor') {
-      navigate('/tutor/dashboard');
-      return;
+    if (activeSocket.connected) {
+      handleConnect();
     }
 
-    if (user?.userType === 'student') {
-      navigate('/student/dashboard');
-      return;
-    }
+    activeSocket.on("connect", handleConnect);
 
-    const activeState = getActiveAuthState();
-    if (activeState.userType === 'tutor') {
-      navigate('/tutor/dashboard');
-      return;
-    }
-    if (activeState.userType === 'student') {
-      navigate('/student/dashboard');
-      return;
-    }
+    const handleIncomingMessage = (message: Message) => {
+      setMessages((previousMessages: Message[]) => [...previousMessages, message]);
+    };
 
-    const studentState = getAuthStateForType('student');
-    if (studentState.user) {
-      navigate('/student/dashboard');
-      return;
-    }
-
-    const tutorState = getAuthStateForType('tutor');
-    if (tutorState.user) {
-      navigate('/tutor/dashboard');
-      return;
-    }
-
-    navigate('/');
-  }, [navigate, user]);
-
-  useEffect(() => {
-    const sessionEndedHandler = (payload: { sessionId: string; endedBy: string }) => {
+    const handleSessionEnded = (payload: { sessionId: string; endedBy: string }) => {
       if (payload?.sessionId?.toString() === sessionId?.toString()) {
-        alert('Session has ended. Returning to dashboard.');
+        window.alert("Session has ended. Returning to dashboard.");
         redirectAfterSession();
       }
     };
 
-    socket.on('session-ended', sessionEndedHandler);
+    const messageListener = (...args: unknown[]) => {
+      const [incoming] = args as [Message | undefined];
+      if (!incoming) {
+        return;
+      }
+      handleIncomingMessage(incoming);
+    };
+
+    const sessionEndedListener = (...args: unknown[]) => {
+      const [incoming] = args as [{ sessionId: string; endedBy: string } | undefined];
+      if (!incoming) {
+        return;
+      }
+      handleSessionEnded(incoming);
+    };
+
+    activeSocket.on("session-message", messageListener);
+    activeSocket.on("session-ended", sessionEndedListener);
 
     return () => {
-      socket.off('session-ended', sessionEndedHandler);
+      if (sessionId) {
+        activeSocket.emit("leave-session", sessionId);
+      }
+      activeSocket.off("connect", handleConnect);
+      activeSocket.off("session-message", messageListener);
+      activeSocket.off("session-ended", sessionEndedListener);
     };
-  }, [sessionId, redirectAfterSession]);
+  }, [sessionId, navigate, redirectAfterSession, sessionSocket]);
 
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user) return;
-    const msg: Message = {
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newMessage.trim() || !user || !sessionId) {
+      return;
+    }
+
+    const message: Message = {
       id: Date.now().toString(),
       text: newMessage.trim(),
       sender: user.username,
       timestamp: new Date().toISOString(),
     };
 
-    socket.emit('session-message', {
-      sessionId,
-      message: msg
-    });
+    setMessages((previousMessages: Message[]) => [...previousMessages, message]);
+    setNewMessage("");
 
-    setMessages((prev: Message[]) => [...prev, msg]);
-    setNewMessage('');
+    sessionSocket.emit("session-message", {
+      sessionId,
+      message,
+    });
   };
 
   const handleEndSession = async () => {
@@ -152,132 +225,147 @@ export default function SessionRoom() {
       return;
     }
 
-    const confirmEnd = window.confirm('Are you sure you want to end this session?');
-    if (!confirmEnd) {
+    if (!window.confirm("Are you sure you want to end this session?")) {
       return;
     }
 
     try {
       const sessionIdNumber = Number(sessionId);
       if (!Number.isInteger(sessionIdNumber)) {
-        alert('Invalid session identifier.');
+        window.alert("Invalid session identifier.");
         return;
       }
 
-      await axios.post('http://localhost:3000/api/queries/session/end', {
+      await axios.post(`${SOCKET_ENDPOINT}/api/queries/session/end`, {
         sessionId: sessionIdNumber,
-        endedBy: user.id
+        endedBy: user.id,
       });
+
       redirectAfterSession();
     } catch (error) {
-      console.error('Error ending session:', error);
-      alert('Failed to end session. Please try again.');
+      console.error("Error ending session:", error);
+      window.alert("Failed to end session. Please try again.");
     }
   };
 
   return (
-    <Box className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">MT</span>
-              </div>
-              <span className="text-xl font-semibold text-gray-900">Session Room</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleEndSession}
-                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-              >
-                End Session
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    <Container className="flex h-[calc(100vh-64px)]">
-      {/* Whiteboard */}
-      <div className="flex-1">
-        <Whiteboard socket={socket} sessionId={sessionId} />
-      </div>
-
-      {/* ---------- Chat Panel ---------- */}
-      <Paper
-        elevation={5}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(to bottom right, #f5f7ff, #e8f0ff)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
         sx={{
-          p: 3,
-          borderRadius: 4,
-          display: "flex",
-          flexDirection: "column",
+          bgcolor: "white",
+          boxShadow: 1,
+          borderBottom: "1px solid",
+          borderColor: "divider",
         }}
       >
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <ChatBubbleOutlineIcon color="primary" />
-          <Typography variant="h5" fontWeight="bold">
-            Chat
-          </Typography>
-        </Box>
-        <Divider sx={{ mb: 2 }} />
-
-        <Box flex={1} overflow="auto" mb={2}>
-          {messages.map((m) => (
-            <Box
-              key={m.id}
-              display="flex"
-              justifyContent={
-                m.sender === user?.username ? "flex-end" : "flex-start"
-              }
-              mb={1}
-            >
-              <Box
-                sx={{
-                  px: 2,
-                  py: 1,
-                  borderRadius: 2,
-                  bgcolor:
-                    m.sender === user?.username
-                      ? "primary.main"
-                      : "grey.200",
-                  color:
-                    m.sender === user?.username
-                      ? "common.white"
-                      : "text.primary",
-                  maxWidth: "80%",
-                }}
-              >
-                <Typography variant="body2">{m.text}</Typography>
-                <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                  {m.sender} •{" "}
-                  {new Date(m.timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Typography>
-              </Box>
-            </Box>
-          ))}
-          <div ref={messagesEndRef} />
-        </Box>
-
-        {/* Input */}
-        <Box component="form" onSubmit={sendMessage} display="flex" gap={1}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-          />
-          <Button variant="contained" color="primary" type="submit">
-            Send
+        <Container
+          maxWidth="lg"
+          sx={{
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={2}>
+            <Avatar sx={{ bgcolor: "primary.main" }}>MT</Avatar>
+            <Typography variant="h6" fontWeight="bold">
+              Session Room
+            </Typography>
+          </Box>
+          <Button variant="contained" color="error" onClick={handleEndSession} sx={{ fontWeight: 600 }}>
+            End Session
           </Button>
-        </Box>
-      </Paper>
-    </Container>
-    </Box >
+        </Container>
+      </Box>
+
+      <Container
+        maxWidth="lg"
+        sx={{ flex: 1, py: 4, display: "grid", gap: 4, gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" } }}
+      >
+        <Paper elevation={5} sx={{ p: 3, borderRadius: 4, display: "flex", flexDirection: "column" }}>
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <DrawIcon color="primary" />
+            <Typography variant="h5" fontWeight="bold">
+              Whiteboard
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <Box flex={1} minHeight={400}>
+            <Whiteboard socket={sessionSocket} sessionId={sessionId} />
+          </Box>
+        </Paper>
+
+        <Paper
+          elevation={5}
+          sx={{
+            p: 3,
+            borderRadius: 4,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1} mb={2}>
+            <ChatBubbleOutlineIcon color="primary" />
+            <Typography variant="h5" fontWeight="bold">
+              Chat
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+
+          <Box flex={1} overflow="auto" mb={2}>
+            {messages.map((message: Message) => {
+              const isOwnMessage = message.sender === user?.username;
+              const timestamp = new Date(message.timestamp);
+              const formattedTime = Number.isNaN(timestamp.getTime())
+                ? ""
+                : timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+              return (
+                <Box key={message.id} display="flex" justifyContent={isOwnMessage ? "flex-end" : "flex-start"} mb={1}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      bgcolor: isOwnMessage ? "primary.main" : "grey.200",
+                      color: isOwnMessage ? "common.white" : "text.primary",
+                      maxWidth: "80%",
+                    }}
+                  >
+                    <Typography variant="body2">{message.text}</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                      {message.sender}
+                      {formattedTime ? ` • ${formattedTime}` : ""}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </Box>
+
+          <Box component="form" onSubmit={sendMessage} display="flex" gap={1}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => setNewMessage(event.target.value)}
+            />
+            <Button variant="contained" color="primary" type="submit">
+              Send
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    </Box>
   );
 }

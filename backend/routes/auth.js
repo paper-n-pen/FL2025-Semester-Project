@@ -37,8 +37,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Please provide at least one specialty for tutor registration' });
     }
 
-    if (ratePer10Min === undefined || ratePer10Min === null || Number(ratePer10Min) <= 0) {
-      return res.status(400).json({ message: 'Tutor profile requires a positive ratePer10Min value' });
+    if (
+      ratePer10Min === undefined ||
+      ratePer10Min === null ||
+      Number.isNaN(Number(ratePer10Min)) ||
+      Number(ratePer10Min) < 0
+    ) {
+      return res.status(400).json({ message: 'Tutor profile requires a non-negative ratePer10Min value' });
     }
   }
 
@@ -50,6 +55,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    console.log('User not found, proceeding with registration. Hashing password...');
     const passwordHash = await bcrypt.hash(password, 10);
 
     const tutorBio = normalizedUserType === 'tutor' ? bio : null;
@@ -99,7 +105,7 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
+    console.error('Error during registration:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

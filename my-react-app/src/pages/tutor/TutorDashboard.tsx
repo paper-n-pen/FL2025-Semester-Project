@@ -2,11 +2,11 @@
 
 import _React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { getAuthStateForType, markActiveUserType, clearAuthState } from '../../utils/authStorage';
+import { getSocket, SOCKET_ENDPOINT } from '../../socket';
 
-const socket = io("http://localhost:3000");
+const socket = getSocket();
 
 interface StudentQuery {
   id: string;
@@ -41,7 +41,7 @@ const TutorDashboard = () => {
         return;
       }
 
-      const response = await axios.get(`http://localhost:3000/api/queries/tutor/${tutorUser.id}/accepted-queries`);
+  const response = await axios.get(`${SOCKET_ENDPOINT}/api/queries/tutor/${tutorUser.id}/accepted-queries`);
       setAcceptedQueries(response.data || []);
     } catch (error) {
       console.error('Error fetching accepted queries:', error);
@@ -93,7 +93,7 @@ const TutorDashboard = () => {
           return;
         }
 
-        const response = await axios.get(`http://localhost:3000/api/queries/tutor/${tutorUser.id}`);
+  const response = await axios.get(`${SOCKET_ENDPOINT}/api/queries/tutor/${tutorUser.id}`);
         const filtered = (response.data || []).filter((item: StudentQuery) => !declinedQueryIdsRef.current.has(item.id));
         setQueries(filtered);
       } catch (error) {
@@ -158,7 +158,7 @@ const TutorDashboard = () => {
         return;
       }
 
-      const response = await axios.post('http://localhost:3000/api/queries/accept', {
+  const response = await axios.post(`${SOCKET_ENDPOINT}/api/queries/accept`, {
         queryId,
         tutorId: tutorUser.id.toString()
       });
@@ -184,7 +184,7 @@ const TutorDashboard = () => {
         return;
       }
 
-      await axios.post('http://localhost:3000/api/queries/decline', {
+  await axios.post(`${SOCKET_ENDPOINT}/api/queries/decline`, {
         queryId,
         tutorId: tutorUser.id
       });
@@ -200,7 +200,7 @@ const TutorDashboard = () => {
 
   const handleStartSession = async (query: StudentQuery) => {
     try {
-      const response = await axios.post('http://localhost:3000/api/queries/session', {
+  const response = await axios.post(`${SOCKET_ENDPOINT}/api/queries/session`, {
         queryId: query.id,
         tutorId: tutorUser.id,
         studentId: query.studentId

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { storeAuthState, markActiveUserType } from '../../utils/authStorage';
+import '../../styles/selectable-options.css';
+import '../../styles/form-feedback.css';
 
 const TutorSetup = () => {
   const [formData, setFormData] = useState({
@@ -14,7 +16,7 @@ const TutorSetup = () => {
     bio: '',
     education: '',
     specialties: [] as string[],
-    ratePer10Min: 0
+    ratePer10Min: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,9 +35,21 @@ const TutorSetup = () => {
   ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
+    if (name === 'ratePer10Min') {
+      if (value === '' || /^\d*(?:\.\d{0,2})?$/.test(value)) {
+        setFormData({
+          ...formData,
+          ratePer10Min: value
+        });
+      }
+      return;
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
   };
 
@@ -46,6 +60,19 @@ const TutorSetup = () => {
         ? formData.specialties.filter((s: string) => s !== specialty)
         : [...formData.specialties, specialty]
     });
+  };
+
+  const passwordsMatch =
+    formData.password.length > 0 && formData.password === formData.confirmPassword;
+  const showPasswordFeedback = formData.confirmPassword.length > 0;
+  const disableSubmit = loading || !passwordsMatch;
+
+  const toTwoDecimalNumber = (value: string) => {
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+    return Number(parsed.toFixed(2));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,6 +93,7 @@ const TutorSetup = () => {
     }
 
     try {
+      const normalizedRate = formData.ratePer10Min ? toTwoDecimalNumber(formData.ratePer10Min) : 0;
       const res = await axios.post('http://localhost:3000/api/register', {
         username: formData.username,
         email: formData.email,
@@ -74,13 +102,16 @@ const TutorSetup = () => {
         bio: formData.bio,
         education: formData.education,
         specialties: formData.specialties,
-        ratePer10Min: formData.ratePer10Min
+        ratePer10Min: normalizedRate
       });
 
       const { token, user } = res.data;
 
       if (token && user) {
-        storeAuthState('tutor', token, user);
+        storeAuthState('tutor', token, {
+          ...user,
+          ratePer10Min: normalizedRate
+        });
         markActiveUserType('tutor');
         navigate('/tutor/dashboard');
         return;
@@ -166,6 +197,11 @@ const TutorSetup = () => {
                 placeholder="Confirm your password"
                 required
               />
+              {showPasswordFeedback && (
+                <p className={`password-feedback ${passwordsMatch ? 'match' : 'mismatch'}`}>
+                  {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -207,20 +243,20 @@ const TutorSetup = () => {
               Select Your Specialties
             </label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {specialties.map((specialty) => (
-                <button
-                  key={specialty}
-                  type="button"
-                  onClick={() => handleSpecialtyToggle(specialty)}
-                  className={`p-3 rounded-lg border transition-all ${
-                    formData.specialties.includes(specialty)
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {specialty}
-                </button>
-              ))}
+              {specialties.map((specialty) => {
+                const isSelected = formData.specialties.includes(specialty);
+                return (
+                  <button
+                    key={specialty}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => handleSpecialtyToggle(specialty)}
+                    className={`selectable-pill${isSelected ? ' is-selected' : ''}`}
+                  >
+                    {specialty}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -229,19 +265,20 @@ const TutorSetup = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Rate per 10 minutes (in $)
             </label>
-            <input
-              type="number"
-              name="ratePer10Min"
-              value={formData.ratePer10Min}
-              onChange={handleChange}
-              className="input"
-              placeholder="e.g., 15"
-              min="1"
-              max="100"
-              required
-            />
+              <input
+                type="number"
+                name="ratePer10Min"
+                value={formData.ratePer10Min}
+                onChange={handleChange}
+                className="input"
+                placeholder="e.g., 12.50"
+                min="0"
+                step="0.01"
+                max="100"
+                required
+              />
             <p className="text-sm text-gray-500 mt-1">
-              Students pay in 10-minute blocks. Set your rate accordingly.
+              Students pay in 10-minute blocks. Enter 0 for free sessions.
             </p>
           </div>
 
@@ -253,7 +290,7 @@ const TutorSetup = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={disableSubmit}
             className="btn btn-primary w-full"
           >
             {loading ? 'Creating Profile...' : 'Create Tutor Profile'}

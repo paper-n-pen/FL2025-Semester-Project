@@ -73,6 +73,8 @@ import {
 } from "@mui/material";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:3000";
+
 export default function CreatePost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -80,6 +82,14 @@ export default function CreatePost() {
     text: "",
     type: "",
   });
+
+  const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(event.target.value);
+  };
+
+  const handleContentChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setContent(event.target.value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +101,7 @@ export default function CreatePost() {
 
     try {
       await axios.post(
-        "http://localhost:3000/api/posts",
+        `${API_BASE_URL}/api/posts`,
         { title, content },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -148,7 +158,7 @@ export default function CreatePost() {
               label="Post Title"
               variant="outlined"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
               required
               fullWidth
             />
@@ -158,7 +168,7 @@ export default function CreatePost() {
               multiline
               minRows={6}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={handleContentChange}
               required
               fullWidth
             />

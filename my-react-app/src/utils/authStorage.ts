@@ -101,3 +101,13 @@ export const clearAuthState = (userType: SupportedUserType) => {
     sessionStorage.removeItem(ACTIVE_USER_SESSION_KEY);
   }
 };
+
+export const clearAllAuthStates = () => {
+  (Object.keys(STORAGE_KEYS) as SupportedUserType[]).forEach((type) => {
+    const keys = STORAGE_KEYS[type];
+    localStorage.removeItem(keys.user);
+    localStorage.removeItem(keys.token);
+  });
+
+  sessionStorage.removeItem(ACTIVE_USER_SESSION_KEY);
+};

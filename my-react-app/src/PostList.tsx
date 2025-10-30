@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
+
 interface Post {
   id: number;
   title: string;
@@ -16,7 +18,7 @@ function PostList() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await axios.get('http://localhost:3000/api/posts');
+  const res = await axios.get(`${API_BASE_URL}/api/posts`);
         setPosts(res.data);
       } catch (err) {
         console.error('Error fetching posts:', err);
